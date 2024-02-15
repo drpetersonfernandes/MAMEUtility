@@ -1,17 +1,25 @@
-﻿using System.IO;
+﻿using System.ComponentModel;
+using System.IO;
 using System.Xml.Linq;
 
 namespace MAMEUtility
 {
     public static class CopyImages
     {
+        public static event EventHandler<ProgressChangedEventArgs> ProgressChanged;
+
         public static void CopyImagesFromXml(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory)
         {
+            int totalFiles = xmlFilePaths.Length;
+            int filesCopied = 0;
+
             foreach (string xmlFilePath in xmlFilePaths)
             {
                 try
                 {
                     ProcessXmlFile(xmlFilePath, sourceDirectory, destinationDirectory);
+                    filesCopied++;
+                    ReportProgress(filesCopied, totalFiles);
                 }
                 catch (Exception ex)
                 {
@@ -22,9 +30,6 @@ namespace MAMEUtility
 
         private static void ProcessXmlFile(string xmlFilePath, string sourceDirectory, string destinationDirectory)
         {
-            // Ensure destination directory exists
-            Directory.CreateDirectory(destinationDirectory);
-
             // Load the XML document
             XDocument xmlDoc = XDocument.Load(xmlFilePath);
 
@@ -34,14 +39,18 @@ namespace MAMEUtility
                                      .Where(name => !string.IsNullOrEmpty(name))
                                      .ToList();
 
+            int totalImages = machineNames.Count;
+            int imagesCopied = 0;
+
             // Copy each corresponding image file to the destination directory
             foreach (var machineName in machineNames)
             {
-#pragma warning disable CS8604 // Possible null reference argument.
                 CopyImageFile(sourceDirectory, destinationDirectory, machineName, "png");
-#pragma warning restore CS8604 // Possible null reference argument.
                 CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpg");
                 CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpeg");
+
+                imagesCopied++;
+                ReportProgress(imagesCopied, totalImages);
             }
         }
 
@@ -60,6 +69,12 @@ namespace MAMEUtility
             {
                 Console.WriteLine($"File not found: {machineName}.{extension}");
             }
+        }
+
+        private static void ReportProgress(int filesCopied, int totalFiles)
+        {
+            double progressPercentage = (double)filesCopied / totalFiles * 100;
+            ProgressChanged?.Invoke(null, new ProgressChangedEventArgs((int)progressPercentage, null));
         }
     }
 }

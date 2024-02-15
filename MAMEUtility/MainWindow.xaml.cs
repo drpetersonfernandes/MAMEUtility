@@ -1,4 +1,5 @@
 ﻿using MAMEUtility;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Xml.Linq;
@@ -8,6 +9,8 @@ namespace MameUtility
 {
     public partial class MainWindow : Window
     {
+        private readonly BackgroundWorker _worker;
+
         [LibraryImport("kernel32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static partial bool AttachConsole(int dwProcessId);
@@ -16,6 +19,12 @@ namespace MameUtility
         {
             AttachConsole(-1); // Attach to parent console
             InitializeComponent();
+
+            _worker = new BackgroundWorker
+            {
+                WorkerReportsProgress = true
+            };
+            _worker.ProgressChanged += Worker_ProgressChanged;
         }
 
         private void About_Click(object sender, RoutedEventArgs e)
@@ -54,7 +63,8 @@ namespace MameUtility
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        MAMEFull.CreateAndSaveMAMEFull(inputDoc, outputFilePathMAMEFull);
+                        MAMEFull.CreateAndSaveMAMEFullAsync(inputDoc, outputFilePathMAMEFull, _worker);
+
                     }
                     catch (Exception ex)
                     {
@@ -98,6 +108,9 @@ namespace MameUtility
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
                         MAMEManufacturer.CreateAndSaveMAMEManufacturer(inputDoc, outputFolderMAMEManufacturer);
+
+                        // Report progress based on the actual progress of the operation
+                        _worker.ReportProgress(100);
                     }
                     catch (Exception ex)
                     {
@@ -140,6 +153,7 @@ namespace MameUtility
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
                         MAMEYear.CreateAndSaveMAMEYear(inputDoc, outputFolderMAMEYear);
+                        _worker.ReportProgress(100);
                     }
                     catch (Exception ex)
                     {
@@ -182,6 +196,8 @@ namespace MameUtility
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
                         MAMESourcefile.CreateAndSaveMAMESourcefile(inputDoc, outputFolderMAMESourcefile);
+
+                        _worker.ReportProgress(100);
                     }
                     catch (Exception ex)
                     {
@@ -232,6 +248,8 @@ namespace MameUtility
                     try
                     {
                         MergeList.MergeAndSave(inputFilePath1, inputFilePath2, outputFilePath);
+
+                        _worker.ReportProgress(100);
                     }
                     catch (Exception ex)
                     {
@@ -280,6 +298,8 @@ namespace MameUtility
                 {
                     string[] xmlFilePaths = openFileDialog.FileNames;
                     CopyRoms.CopyRomsFromXml(xmlFilePaths, sourceDirectory);
+
+                    _worker.ReportProgress(100);
                 }
             }
         }
@@ -326,6 +346,8 @@ namespace MameUtility
                         // Call the method from CopyImages class to copy images
                         CopyImages.CopyImagesFromXml(xmlFilePaths, sourceDirectory, destinationDirectory);
                         Console.WriteLine("Image copy operation is finished.");
+
+                        _worker.ReportProgress(100);
                     }
 #pragma warning restore CS8629 // Nullable value type may be null.
                 }
@@ -340,7 +362,11 @@ namespace MameUtility
             }
         }
 
-
+        private void Worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            // Update the progress bar value
+            Dispatcher.Invoke(() => { ProgressBar.Value = e.ProgressPercentage; });
+        }
 
 
     }
