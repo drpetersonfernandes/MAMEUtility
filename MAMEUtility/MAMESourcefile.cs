@@ -5,19 +5,20 @@ namespace MAMEUtility
 {
     public partial class MAMESourcefile
     {
-        public static void CreateAndSaveMAMESourcefile(XDocument inputDoc, string outputFolderMAMESourcefile)
+        public static async Task CreateAndSaveMAMESourcefileAsync(XDocument inputDoc, string outputFolderMAMESourcefile, IProgress<int> progress)
         {
             Console.WriteLine($"Output folder for MAME Sourcefile: {outputFolderMAMESourcefile}");
 
             try
             {
                 // Extract unique source files
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                 var sourceFiles = inputDoc.Descendants("machine")
-                                          .Select(m => (string)m.Attribute("sourcefile"))
-                                          .Distinct()
-                                          .Where(s => !string.IsNullOrEmpty(s));
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+                    .Select(m => (string?)m.Attribute("sourcefile"))
+                    .Distinct()
+                    .Where(s => !string.IsNullOrEmpty(s));
+
+                int totalSourceFiles = sourceFiles.Count();
+                int sourceFilesProcessed = 0;
 
                 // Iterate over each source file and create an XML for each
                 foreach (var sourceFile in sourceFiles)
@@ -39,10 +40,13 @@ namespace MAMEUtility
                     string outputFilePath = Path.Combine(outputFolderMAMESourcefile, $"{safeSourceFileName}.xml");
 
                     // Create and save the filtered document
-                    CreateAndSaveFilteredDocument(inputDoc, outputFilePath, sourceFile);
+                    await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, sourceFile);
+
+                    sourceFilesProcessed++;
+                    double progressPercentage = (double)sourceFilesProcessed / totalSourceFiles * 100;
+                    progress.Report((int)progressPercentage);
                 }
 
-                Console.WriteLine("Data extracted and saved successfully for all source files.");
             }
             catch (Exception ex)
             {
@@ -50,13 +54,11 @@ namespace MAMEUtility
             }
         }
 
-        private static void CreateAndSaveFilteredDocument(XDocument inputDoc, string outputPath, string sourceFile)
+        private static async Task CreateAndSaveFilteredDocumentAsync(XDocument inputDoc, string outputPath, string sourceFile)
         {
             // Filtering condition based on the source file
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
             bool predicate(XElement machine) =>
-                (string)machine.Attribute("sourcefile")?.Value == sourceFile;
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+                (string?)machine.Attribute("sourcefile") == sourceFile;
 
             // Create a new XML document for machines based on the predicate
             XDocument filteredDoc = new(
@@ -73,7 +75,7 @@ namespace MAMEUtility
             // Save the filtered XML document
             try
             {
-                filteredDoc.Save(outputPath);
+                await Task.Run(() => filteredDoc.Save(outputPath));
                 Console.WriteLine($"Successfully created: {outputPath}");
             }
             catch (Exception ex)
@@ -87,7 +89,7 @@ namespace MAMEUtility
             char[] invalidChars = Path.GetInvalidFileNameChars();
             foreach (char invalidChar in invalidChars)
             {
-                fileName = fileName.Replace(invalidChar, '_'); // Replace invalid characters with underscores
+                fileName = fileName.Replace(invalidChar, '_');
             }
             return fileName;
         }

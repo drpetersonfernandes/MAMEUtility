@@ -47,12 +47,7 @@ namespace MAMEUtility
                     )
                 );
 
-                // Save the document asynchronously
                 allMachineDetailsDoc.Save(outputFilePathMAMEFull);
-
-                Console.WriteLine("MAMEFull saved.");
-
-                // Report completion
                 worker.ReportProgress(100);
             });
         }

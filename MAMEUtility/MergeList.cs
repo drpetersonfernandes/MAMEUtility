@@ -1,4 +1,5 @@
-﻿using System.Xml.Linq;
+﻿using System;
+using System.Xml.Linq;
 
 namespace MameUtility
 {
@@ -17,7 +18,6 @@ namespace MameUtility
 
         public static XDocument MergeDocuments(XDocument doc1, XDocument doc2)
         {
-            // Check if either document is null
             if (doc1 == null && doc2 == null)
             {
                 throw new ArgumentNullException(nameof(doc1), "Both documents are null.");
@@ -31,26 +31,20 @@ namespace MameUtility
                 return new XDocument(doc1);
             }
 
+            // Ensure the documents have a root before proceeding
+            if (doc1.Root == null || doc2.Root == null)
+            {
+                throw new InvalidOperationException("One or both documents do not have a root element.");
+            }
+
             // Create a new XDocument to hold the merged content
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
             XDocument mergedDoc = new(new XElement(doc1.Root.Name));
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
 
-            // Add elements from the first document
-            if (doc1.Root != null)
-            {
-                mergedDoc.Root?.Add(doc1.Root.Elements());
-            }
-
-            // Add elements from the second document
-            if (doc2.Root != null)
-            {
-                mergedDoc.Root?.Add(doc2.Root.Elements());
-            }
+            // Add elements from both documents, asserting Root is not null
+            mergedDoc.Root!.Add(doc1.Root.Elements());
+            mergedDoc.Root!.Add(doc2.Root.Elements());
 
             return mergedDoc;
         }
-
-
     }
 }

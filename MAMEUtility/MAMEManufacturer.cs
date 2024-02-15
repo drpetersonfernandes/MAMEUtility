@@ -1,10 +1,13 @@
-﻿using System.Xml.Linq;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace MAMEUtility
 {
     public partial class MAMEManufacturer
     {
-        public static void CreateAndSaveMAMEManufacturer(XDocument inputDoc, string outputFolderMAMEManufacturer)
+        public static async Task CreateAndSaveMAMEManufacturerAsync(XDocument inputDoc, string outputFolderMAMEManufacturer, IProgress<int> progress)
         {
             Console.WriteLine($"Output folder for MAME Manufacturer: {outputFolderMAMEManufacturer}");
 
@@ -16,24 +19,27 @@ namespace MAMEUtility
                     .Distinct()
                     .Where(m => !string.IsNullOrEmpty(m));
 
+                int totalManufacturers = manufacturers.Count();
+                int manufacturersProcessed = 0;
+
                 // Iterate over each manufacturer and create an XML for each
                 foreach (var manufacturer in manufacturers)
                 {
                     if (manufacturer != null)
                     {
                         string safeManufacturerName = RemoveExtraWhitespace(manufacturer
-                        .Replace("<", "")
-                        .Replace(">", "")
-                        .Replace(":", "")
-                        .Replace("\"", "")
-                        .Replace("/", "")
-                        .Replace("\\", "")
-                        .Replace("|", "")
-                        .Replace("?", "")
-                        .Replace("*", "")
-                        .Replace("unknown", "UnknownManufacturer")
-                        .Trim())
-                        .Replace("&amp;", "&");  // Replace &amp; with & in the filename.
+                            .Replace("<", "")
+                            .Replace(">", "")
+                            .Replace(":", "")
+                            .Replace("\"", "")
+                            .Replace("/", "")
+                            .Replace("\\", "")
+                            .Replace("|", "")
+                            .Replace("?", "")
+                            .Replace("*", "")
+                            .Replace("unknown", "UnknownManufacturer")
+                            .Trim())
+                            .Replace("&amp;", "&");  // Replace &amp; with & in the filename.
 
                         if (safeManufacturerName.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase))
                         {
@@ -43,10 +49,15 @@ namespace MAMEUtility
 
                         string outputFilePath = System.IO.Path.Combine(outputFolderMAMEManufacturer, $"{safeManufacturerName}.xml");
                         Console.WriteLine($"Attempting to create file for: {safeManufacturerName}.xml");
-                        CreateAndSaveFilteredDocument(inputDoc, outputFilePath, manufacturer, safeManufacturerName);
+
+                        await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, manufacturer, safeManufacturerName);
+
+                        manufacturersProcessed++;
+                        double progressPercentage = (double)manufacturersProcessed / totalManufacturers * 100;
+                        progress.Report((int)progressPercentage);
                     }
                 }
-                Console.WriteLine("Data extracted and saved successfully for all manufacturers.");
+
             }
             catch (Exception ex)
             {
@@ -54,30 +65,36 @@ namespace MAMEUtility
             }
         }
 
-        private static void CreateAndSaveFilteredDocument(XDocument inputDoc, string outputPath, string manufacturer, string safeManufacturerName)
+        private static async Task CreateAndSaveFilteredDocumentAsync(XDocument inputDoc, string outputPath, string manufacturer, string safeManufacturerName)
         {
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
+            XDocument filteredDoc = CreateFilteredDocument(inputDoc, manufacturer);
+
+            try
+            {
+                await Task.Run(() => filteredDoc.Save(outputPath));
+                Console.WriteLine($"Successfully created: {outputPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to create file for {safeManufacturerName}. Error: {ex.Message}");
+            }
+        }
+
+        private static XDocument CreateFilteredDocument(XDocument inputDoc, string manufacturer)
+        {
             bool predicate(XElement machine) =>
-                (string)(machine.Element("manufacturer")?.Value ?? "") == manufacturer &&
-                !(machine.Attribute("name")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) && // Exclude machines with 'bootleg' in the name
-                !(machine.Element("description")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&  // Exclude machines with 'bootleg' in the description
-                !(machine.Element("description")?.Value.Contains("prototype", StringComparison.InvariantCultureIgnoreCase) ?? false) &&  // Exclude machines with 'prototype' in the description
-                !(machine.Element("description")?.Value.Contains("playchoice", StringComparison.InvariantCultureIgnoreCase) ?? false) &&  // Exclude machines with 'playchoice' in the description
-                !(machine.Attribute("name")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ?? false) &&  // Exclude machines with 'bios' in the name
-                !(machine.Element("description")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ?? false) &&  // Exclude machines with 'bios' in the description
-                (string)(machine.Element("driver").Attribute("emulation")?.Value ?? "") == "good" && // Only add machines with emulation status good
-                machine.Attribute("cloneof") == null; // Exclude clones
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
+                (machine.Element("manufacturer")?.Value ?? "") == manufacturer &&
+                !(machine.Attribute("name")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                !(machine.Element("description")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                !(machine.Element("description")?.Value.Contains("prototype", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                !(machine.Element("description")?.Value.Contains("playchoice", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                !(machine.Attribute("name")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                !(machine.Element("description")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                (machine.Element("driver")?.Attribute("emulation")?.Value ?? "") == "good" &&
+                machine.Attribute("cloneof") == null;
 
             // Retrieve the matched machines
             var matchedMachines = inputDoc.Descendants("machine").Where(predicate).ToList();
-
-            // Check if any machines matched
-            if (matchedMachines.Count == 0)
-            {
-                Console.WriteLine($"No machines matched for {manufacturer}. Skipping file creation.");
-                return;
-            }
 
             // Create a new XML document for machines based on the matched machines
             XDocument filteredDoc = new(
@@ -91,16 +108,7 @@ namespace MAMEUtility
                 )
             );
 
-            // Save the filtered XML document
-            try
-            {
-                filteredDoc.Save(outputPath);
-                Console.WriteLine($"Successfully created: {outputPath}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to create file for {safeManufacturerName}. Error: {ex.Message}");
-            }
+            return filteredDoc;
         }
 
         private static string RemoveExtraWhitespace(string input)

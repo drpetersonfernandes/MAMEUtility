@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Xml.Linq;
 using MessageBox = System.Windows.MessageBox;
 
@@ -17,7 +18,7 @@ namespace MameUtility
 
         public MainWindow()
         {
-            AttachConsole(-1); // Attach to parent console
+            AttachConsole(-1);
             InitializeComponent();
 
             _worker = new BackgroundWorker
@@ -37,8 +38,11 @@ namespace MameUtility
             System.Windows.Application.Current.Shutdown();
         }
 
-        private void CreateMAMEFull_Click(object sender, RoutedEventArgs e)
+        private async void CreateMAMEFull_Click(object sender, RoutedEventArgs e)
         {
+            _worker.ReportProgress(0);
+
+            Console.WriteLine("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             Microsoft.Win32.OpenFileDialog openFileDialog = new()
             {
                 Title = "Select MAME full driver information in XML",
@@ -49,6 +53,7 @@ namespace MameUtility
             {
                 string inputFilePath = openFileDialog.FileName;
 
+                Console.WriteLine("Put a name to your output file.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
                 {
                     Title = "Save MAMEFull",
@@ -63,8 +68,8 @@ namespace MameUtility
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        MAMEFull.CreateAndSaveMAMEFullAsync(inputDoc, outputFilePathMAMEFull, _worker);
-
+                        await MAMEFull.CreateAndSaveMAMEFullAsync(inputDoc, outputFilePathMAMEFull, _worker);
+                        Console.WriteLine("Output file saved.");
                     }
                     catch (Exception ex)
                     {
@@ -73,18 +78,20 @@ namespace MameUtility
                 }
                 else
                 {
-                    Console.WriteLine("No output file specified for MAMEFull.xml. Exiting.");
+                    Console.WriteLine("No output file specified for MAMEFull.xml. Operation cancelled.");
                 }
-
             }
             else
             {
-                Console.WriteLine("No input file selected. Exiting.");
+                Console.WriteLine("No input file selected. Operation cancelled.");
             }
         }
 
-        private void CreateMAMEManufacturer_Click(object sender, RoutedEventArgs e)
+        private async void CreateMAMEManufacturer_Click(object sender, RoutedEventArgs e)
         {
+            _worker.ReportProgress(0);
+
+            Console.WriteLine("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             Microsoft.Win32.OpenFileDialog openFileDialog = new()
             {
                 Title = "Select MAME full driver information in XML",
@@ -95,7 +102,8 @@ namespace MameUtility
             {
                 string inputFilePath = openFileDialog.FileName;
 
-                FolderBrowserDialog folderBrowserDialog = new()
+                Console.WriteLine("Select Output Folder.");
+                var folderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
                 {
                     Description = "Select Output Folder"
                 };
@@ -107,10 +115,14 @@ namespace MameUtility
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        MAMEManufacturer.CreateAndSaveMAMEManufacturer(inputDoc, outputFolderMAMEManufacturer);
 
-                        // Report progress based on the actual progress of the operation
-                        _worker.ReportProgress(100);
+                        var progress = new Progress<int>(value =>
+                        {
+                            ProgressBar.Value = value;
+                        });
+
+                        await MAMEManufacturer.CreateAndSaveMAMEManufacturerAsync(inputDoc, outputFolderMAMEManufacturer, progress);
+                        Console.WriteLine("Data extracted and saved successfully for all manufacturers.");
                     }
                     catch (Exception ex)
                     {
@@ -119,17 +131,20 @@ namespace MameUtility
                 }
                 else
                 {
-                    Console.WriteLine("No output folder specified. Exiting.");
+                    Console.WriteLine("No output folder specified. Operation cancelled.");
                 }
             }
             else
             {
-                Console.WriteLine("No input file selected. Exiting.");
+                Console.WriteLine("No input file selected. Operation cancelled.");
             }
         }
 
-        private void CreateMAMEYear_Click(object sender, RoutedEventArgs e)
+        private async void CreateMAMEYear_Click(object sender, RoutedEventArgs e)
         {
+            _worker.ReportProgress(0);
+
+            Console.WriteLine("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             Microsoft.Win32.OpenFileDialog openFileDialog = new()
             {
                 Title = "Select MAME full driver information in XML",
@@ -140,7 +155,8 @@ namespace MameUtility
             {
                 string inputFilePath = openFileDialog.FileName;
 
-                FolderBrowserDialog folderBrowserDialog = new()
+                Console.WriteLine("Select Output Folder.");
+                var folderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
                 {
                     Description = "Select Output Folder"
                 };
@@ -152,8 +168,14 @@ namespace MameUtility
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        MAMEYear.CreateAndSaveMAMEYear(inputDoc, outputFolderMAMEYear);
-                        _worker.ReportProgress(100);
+
+                        var progress = new Progress<int>(value =>
+                        {
+                            ProgressBar.Value = value;
+                        });
+
+                        await Task.Run(() => MAMEYear.CreateAndSaveMAMEYear(inputDoc, outputFolderMAMEYear, progress));
+                        Console.WriteLine("XML files created successfully for all years.");
                     }
                     catch (Exception ex)
                     {
@@ -162,17 +184,20 @@ namespace MameUtility
                 }
                 else
                 {
-                    Console.WriteLine("No output folder specified. Exiting.");
+                    Console.WriteLine("No output folder specified. Operation cancelled.");
                 }
             }
             else
             {
-                Console.WriteLine("No input file selected. Exiting.");
+                Console.WriteLine("No input file selected. Operation cancelled.");
             }
         }
 
-        private void CreateMAMESourcefile_Click(object sender, RoutedEventArgs e)
+        private async void CreateMAMESourcefile_Click(object sender, RoutedEventArgs e)
         {
+            _worker.ReportProgress(0);
+
+            Console.WriteLine("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             Microsoft.Win32.OpenFileDialog openFileDialog = new()
             {
                 Title = "Select MAME full driver information in XML",
@@ -183,6 +208,7 @@ namespace MameUtility
             {
                 string inputFilePath = openFileDialog.FileName;
 
+                Console.WriteLine("Select Output Folder.");
                 FolderBrowserDialog folderBrowserDialog = new()
                 {
                     Description = "Select Output Folder"
@@ -195,9 +221,14 @@ namespace MameUtility
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        MAMESourcefile.CreateAndSaveMAMESourcefile(inputDoc, outputFolderMAMESourcefile);
 
-                        _worker.ReportProgress(100);
+                        var progress = new Progress<int>(value =>
+                        {
+                            ProgressBar.Value = value;
+                        });
+
+                        await MAMESourcefile.CreateAndSaveMAMESourcefileAsync(inputDoc, outputFolderMAMESourcefile, progress);
+                        Console.WriteLine("Data extracted and saved successfully for all source files.");
                     }
                     catch (Exception ex)
                     {
@@ -206,23 +237,27 @@ namespace MameUtility
                 }
                 else
                 {
-                    Console.WriteLine("No output folder specified. Exiting.");
+                    Console.WriteLine("No output folder specified. Operation cancelled.");
                 }
             }
             else
             {
-                Console.WriteLine("No input file selected. Exiting.");
+                Console.WriteLine("No input file selected. Operation cancelled.");
             }
         }
 
         private void MergeLists_Click(object sender, RoutedEventArgs e)
         {
+            _worker.ReportProgress(0);
+
+            Console.WriteLine("Select first XML file to merge.");
             Microsoft.Win32.OpenFileDialog openFileDialog1 = new()
             {
                 Title = "Select first XML file to merge",
                 Filter = "XML files (*.xml)|*.xml"
             };
 
+            Console.WriteLine("Select second XML file to merge.");
             Microsoft.Win32.OpenFileDialog openFileDialog2 = new()
             {
                 Title = "Select second XML file to merge",
@@ -234,6 +269,7 @@ namespace MameUtility
                 string inputFilePath1 = openFileDialog1.FileName;
                 string inputFilePath2 = openFileDialog2.FileName;
 
+                Console.WriteLine("Put a name to your output file.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
                 {
                     Title = "Save Merged XML",
@@ -248,6 +284,7 @@ namespace MameUtility
                     try
                     {
                         MergeList.MergeAndSave(inputFilePath1, inputFilePath2, outputFilePath);
+                        Console.WriteLine("Merging is finished.");
 
                         _worker.ReportProgress(100);
                     }
@@ -258,18 +295,19 @@ namespace MameUtility
                 }
                 else
                 {
-                    Console.WriteLine("No output file specified for merged XML. Exiting.");
+                    Console.WriteLine("No output file specified for merged XML. Operation cancelled.");
                 }
             }
             else
             {
-                Console.WriteLine("No input file selected. Exiting.");
+                Console.WriteLine("No input file selected. Operation cancelled.");
             }
         }
 
-        private void CopyRoms_Click(object sender, RoutedEventArgs e)
+        private async void CopyRoms_Click(object sender, RoutedEventArgs e)
         {
-            // Prompt user to select the source directory
+            _worker.ReportProgress(0);
+
             Console.WriteLine("Select the source directory containing the ROMs.");
             var sourceFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
             {
@@ -280,8 +318,7 @@ namespace MameUtility
             {
                 string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
-                // Initialize the OpenFileDialog
-                Console.WriteLine("Please select the XML file(s) containing ROM information.");
+                Console.WriteLine("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
                 Microsoft.Win32.OpenFileDialog openFileDialog = new()
                 {
                     Title = "Please select the XML file(s) containing ROM information",
@@ -289,25 +326,38 @@ namespace MameUtility
                     Multiselect = true
                 };
 
-                if (openFileDialog.ShowDialog() == null)
+                if (openFileDialog.ShowDialog() == true)
                 {
-                    Console.WriteLine("You did not provide the XML file(s) containing ROM information.");
-                    return;
+                    string[] xmlFilePaths = openFileDialog.FileNames;
+
+                    try
+                    {
+                        var progress = new Progress<int>(value =>
+                        {
+                            ProgressBar.Value = value;
+                        });
+
+                        await CopyRoms.CopyRomsFromXmlAsync(xmlFilePaths, sourceDirectory, progress);
+                        Console.WriteLine("ROM copy operation is finished.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"An error occurred: {ex.Message}");
+                    }
+
+                    _worker.ReportProgress(100);
                 }
                 else
                 {
-                    string[] xmlFilePaths = openFileDialog.FileNames;
-                    CopyRoms.CopyRomsFromXml(xmlFilePaths, sourceDirectory);
-
-                    _worker.ReportProgress(100);
+                    Console.WriteLine("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
                 }
             }
         }
 
-
-        private void CopyImages_Click(object sender, RoutedEventArgs e)
+        private async void CopyImages_Click(object sender, RoutedEventArgs e)
         {
-            // Prompt user to select the source directory for the images
+            _worker.ReportProgress(0);
+
             Console.WriteLine("Select the source directory containing the images.");
             var sourceFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
             {
@@ -318,7 +368,6 @@ namespace MameUtility
             {
                 string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
-                // Prompt user to select the destination directory for the images
                 Console.WriteLine("Select the destination directory for the images.");
                 var destinationFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
                 {
@@ -329,8 +378,7 @@ namespace MameUtility
                 {
                     string destinationDirectory = destinationFolderBrowserDialog.SelectedPath;
 
-                    // Initialize OpenFileDialog for XML file selection
-                    Console.WriteLine("Please select the XML file(s) containing ROM information.");
+                    Console.WriteLine("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
                     Microsoft.Win32.OpenFileDialog openFileDialog = new()
                     {
                         Title = "Please select the XML file(s) containing ROM information",
@@ -338,36 +386,48 @@ namespace MameUtility
                         Multiselect = true
                     };
 
-#pragma warning disable CS8629 // Nullable value type may be null.
-                    if ((bool)openFileDialog.ShowDialog())
+                    if (openFileDialog.ShowDialog() == true)
                     {
                         string[] xmlFilePaths = openFileDialog.FileNames;
 
-                        // Call the method from CopyImages class to copy images
-                        CopyImages.CopyImagesFromXml(xmlFilePaths, sourceDirectory, destinationDirectory);
-                        Console.WriteLine("Image copy operation is finished.");
+                        try
+                        {
+                            var progressReporter = new ProgressBarProgressReporter(_worker);
 
-                        _worker.ReportProgress(100);
+                            await CopyImages.CopyImagesFromXmlAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progressReporter);
+                            Console.WriteLine("Image copy operation is finished.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("An error occurred: " + ex.Message);
+                        }
                     }
-#pragma warning restore CS8629 // Nullable value type may be null.
                 }
                 else
                 {
-                    Console.WriteLine("No destination directory selected, operation cancelled.");
+                    Console.WriteLine("No destination directory selected. Operation cancelled.");
                 }
             }
             else
             {
-                Console.WriteLine("No source directory selected, operation cancelled.");
+                Console.WriteLine("No source directory selected. Operation cancelled.");
             }
         }
 
-        private void Worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        private void Worker_ProgressChanged(object? sender, ProgressChangedEventArgs e)
         {
-            // Update the progress bar value
             Dispatcher.Invoke(() => { ProgressBar.Value = e.ProgressPercentage; });
         }
 
+        public class ProgressBarProgressReporter(BackgroundWorker worker) : IProgress<int>
+        {
+            private readonly BackgroundWorker _worker = worker;
+
+            public void Report(int value)
+            {
+                _worker.ReportProgress(value);
+            }
+        }
 
     }
 }

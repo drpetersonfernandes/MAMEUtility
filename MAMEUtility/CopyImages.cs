@@ -1,14 +1,11 @@
-﻿using System.ComponentModel;
-using System.IO;
+﻿using System.IO;
 using System.Xml.Linq;
 
 namespace MAMEUtility
 {
     public static class CopyImages
     {
-        public static event EventHandler<ProgressChangedEventArgs> ProgressChanged;
-
-        public static void CopyImagesFromXml(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory)
+        public static async Task CopyImagesFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
             int totalFiles = xmlFilePaths.Length;
             int filesCopied = 0;
@@ -17,9 +14,10 @@ namespace MAMEUtility
             {
                 try
                 {
-                    ProcessXmlFile(xmlFilePath, sourceDirectory, destinationDirectory);
+                    await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress);
                     filesCopied++;
-                    ReportProgress(filesCopied, totalFiles);
+                    double progressPercentage = (double)filesCopied / totalFiles * 100;
+                    progress.Report((int)progressPercentage);
                 }
                 catch (Exception ex)
                 {
@@ -28,12 +26,9 @@ namespace MAMEUtility
             }
         }
 
-        private static void ProcessXmlFile(string xmlFilePath, string sourceDirectory, string destinationDirectory)
+        private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
-            // Load the XML document
             XDocument xmlDoc = XDocument.Load(xmlFilePath);
-
-            // Get all machine names from the XML document
             var machineNames = xmlDoc.Descendants("Machine")
                                      .Select(machine => machine.Element("MachineName")?.Value)
                                      .Where(name => !string.IsNullOrEmpty(name))
@@ -42,39 +37,42 @@ namespace MAMEUtility
             int totalImages = machineNames.Count;
             int imagesCopied = 0;
 
-            // Copy each corresponding image file to the destination directory
             foreach (var machineName in machineNames)
             {
-                CopyImageFile(sourceDirectory, destinationDirectory, machineName, "png");
-                CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpg");
-                CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpeg");
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "png");
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpg");
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpeg");
 
                 imagesCopied++;
-                ReportProgress(imagesCopied, totalImages);
+                double progressPercentage = (double)imagesCopied / totalImages * 100;
+                progress.Report((int)progressPercentage);
             }
         }
 
-        private static void CopyImageFile(string sourceDirectory, string destinationDirectory, string machineName, string extension)
+        private static Task CopyImageFileAsync(string sourceDirectory, string destinationDirectory, string? machineName, string extension)
         {
+            if (machineName == null)
+            {
+                Console.WriteLine($"Machine name is null for extension: {extension}");
+                return Task.CompletedTask;
+            }
+
             string sourceFile = Path.Combine(sourceDirectory, machineName + "." + extension);
             string destinationFile = Path.Combine(destinationDirectory, machineName + "." + extension);
 
-            // Check if the file exists before attempting to copy
-            if (File.Exists(sourceFile))
+            return Task.Run(() =>
             {
-                File.Copy(sourceFile, destinationFile, overwrite: true);
-                Console.WriteLine($"Copied: {machineName}.{extension} to {destinationDirectory}");
-            }
-            else
-            {
-                Console.WriteLine($"File not found: {machineName}.{extension}");
-            }
+                if (File.Exists(sourceFile))
+                {
+                    File.Copy(sourceFile, destinationFile, overwrite: true);
+                    Console.WriteLine($"Copied: {machineName}.{extension} to {destinationDirectory}");
+                }
+                else
+                {
+                    Console.WriteLine($"File not found: {machineName}.{extension}");
+                }
+            });
         }
 
-        private static void ReportProgress(int filesCopied, int totalFiles)
-        {
-            double progressPercentage = (double)filesCopied / totalFiles * 100;
-            ProgressChanged?.Invoke(null, new ProgressChangedEventArgs((int)progressPercentage, null));
-        }
     }
 }

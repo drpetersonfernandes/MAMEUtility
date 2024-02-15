@@ -9,8 +9,7 @@
     Width="565"
     Height="540"
     mc:Ignorable="d">
-    
-    
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
