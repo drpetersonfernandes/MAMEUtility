@@ -352,6 +352,10 @@ namespace MameUtility
                     Console.WriteLine("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
                 }
             }
+            else
+            {
+                Console.WriteLine("You did not provide the source directory containing the ROMs. Operation cancelled.");
+            }
         }
 
         private async void CopyImages_Click(object sender, RoutedEventArgs e)
