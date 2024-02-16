@@ -26,7 +26,7 @@ The tool is built using C#, WPF (Windows Presentation Foundation) framework and 
 
 ## Usage
 
-Upon launching the MAME Utility Tool, users are greeted with a straightforward interface divided into sections for each of its core functionalities:
+Upon launching the MAME Utility, users are greeted with a straightforward interface divided into sections for each of its core functionalities:
 
 1. **Generate Lists**: Choose from creating a full list, manufacturer list, year list, or source file list of MAME games.
 2. **Merge Lists**: Select multiple XML files to merge into a single file.
