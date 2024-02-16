@@ -15,7 +15,6 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
-            <!-- Add a row for the progress bar -->
         </Grid.RowDefinitions>
 
         <Menu Grid.Row="0">
@@ -81,13 +80,22 @@
                 Content="Copy Images" />
         </StackPanel>
 
-        <!-- Progress bar at the bottom of the window -->
-        <ProgressBar Grid.Row="2" Name="ProgressBar" Height="25" Margin="10,0,10,10" Value="{Binding Path=OverallProgress, RelativeSource={RelativeSource AncestorType=Window}}">
+        <!--  Progress bar  -->
+        <ProgressBar
+            Name="ProgressBar"
+            Grid.Row="2"
+            Height="25"
+            Margin="10,0,10,10"
+            Value="{Binding Path=OverallProgress, RelativeSource={RelativeSource AncestorType=Window}}">
             <ProgressBar.Template>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid>
-                        <ProgressBar Value="{TemplateBinding Value}" Background="{TemplateBinding Background}" />
-                        <TextBlock Text="{Binding Path=Value, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0}%}" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="Black" />
+                        <ProgressBar Background="{TemplateBinding Background}" Value="{TemplateBinding Value}" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="Black"
+                            Text="{Binding Path=Value, RelativeSource={RelativeSource TemplatedParent}, StringFormat={}{0}%}" />
                     </Grid>
                 </ControlTemplate>
             </ProgressBar.Template>

@@ -5,7 +5,7 @@ namespace MAMEUtility
 {
     public static class CopyRoms
     {
-        public static async Task CopyRomsFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, IProgress<int> progress)
+        public static async Task CopyRomsFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
             int totalFiles = xmlFilePaths.Length;
             int filesProcessed = 0;
@@ -14,7 +14,7 @@ namespace MAMEUtility
             {
                 try
                 {
-                    await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, progress);
+                    await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress);
                     filesProcessed++;
                     double progressPercentage = (double)filesProcessed / totalFiles * 100;
                     progress.Report((int)progressPercentage);
@@ -26,9 +26,16 @@ namespace MAMEUtility
             }
         }
 
-        private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, IProgress<int> progress)
+        private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
             XDocument xmlDoc = XDocument.Load(xmlFilePath);
+
+            // Validate the XML document structure
+            if (!ValidateXmlStructure(xmlDoc))
+            {
+                Console.WriteLine($"The file {Path.GetFileName(xmlFilePath)} does not match the required XML structure. Operation cancelled.");
+                return; // Stop processing this XML file
+            }
 
             var machineNames = xmlDoc.Descendants("Machine")
                                      .Select(machine => machine.Element("MachineName")?.Value)
@@ -40,47 +47,35 @@ namespace MAMEUtility
 
             foreach (var machineName in machineNames)
             {
-                if (machineName != null)
-                {
-                    await CopyRomAsync(sourceDirectory, machineName);
+                await CopyRomAsync(sourceDirectory, destinationDirectory, machineName!);
 
-                    romsProcessed++;
-                    double progressPercentage = (double)romsProcessed / totalRoms * 100;
-                    progress.Report((int)progressPercentage);
-                }
-                else
-                {
-                    Console.WriteLine("Invalid machine name: null");
-                }
+                romsProcessed++;
+                double progressPercentage = (double)romsProcessed / totalRoms * 100;
+                progress.Report((int)progressPercentage);
             }
         }
 
-        private static Task CopyRomAsync(string sourceDirectory, string machineName)
+        private static Task CopyRomAsync(string sourceDirectory, string destinationDirectory, string machineName)
         {
             return Task.Run(() =>
             {
+                Console.WriteLine($"Attempting to copy ROM for machine: {machineName}");
                 try
                 {
-                    if (machineName != null)
+                    string sourceFile = Path.Combine(sourceDirectory, machineName + ".zip");
+                    string destinationFile = Path.Combine(destinationDirectory, machineName + ".zip");
+
+                    Console.WriteLine($"Source file path: {sourceFile}");
+                    Console.WriteLine($"Destination file path: {destinationFile}");
+
+                    if (File.Exists(sourceFile))
                     {
-                        string sourceFile = Path.Combine(sourceDirectory, machineName + ".zip");
-
-                        if (File.Exists(sourceFile))
-                        {
-                            string destinationDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments); // Default destination directory
-                            string destinationFile = Path.Combine(destinationDirectory, machineName + ".zip");
-
-                            File.Copy(sourceFile, destinationFile, overwrite: true);
-                            Console.WriteLine($"Copied: {machineName}.zip to {destinationDirectory}");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"File not found: {machineName}.zip");
-                        }
+                        File.Copy(sourceFile, destinationFile, overwrite: true);
+                        Console.WriteLine($"Successfully copied: {machineName}.zip to {destinationDirectory}");
                     }
                     else
                     {
-                        Console.WriteLine($"Invalid machine name: {machineName}");
+                        Console.WriteLine($"File not found: {sourceFile}");
                     }
                 }
                 catch (Exception ex)
@@ -88,6 +83,18 @@ namespace MAMEUtility
                     Console.WriteLine($"An error occurred copying ROM for {machineName}: {ex.Message}");
                 }
             });
+        }
+
+        private static bool ValidateXmlStructure(XDocument xmlDoc)
+        {
+            // Check if the root element is "Machines" and if it contains at least one "Machine" element
+            // with both "MachineName" and "Description" child elements.
+            var isValid = xmlDoc.Root?.Name.LocalName == "Machines" &&
+                          xmlDoc.Descendants("Machine").Any(machine =>
+                              machine.Element("MachineName") != null &&
+                              machine.Element("Description") != null);
+
+            return isValid;
         }
 
     }

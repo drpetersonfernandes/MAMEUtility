@@ -5,46 +5,61 @@ namespace MameUtility
 {
     public static class MergeList
     {
-        public static void MergeAndSave(string inputFilePath1, string inputFilePath2, string outputFilePath)
+        public static void MergeAndSave(string[] inputFilePaths, string outputFilePath)
         {
-            XDocument inputDoc1 = XDocument.Load(inputFilePath1);
-            XDocument inputDoc2 = XDocument.Load(inputFilePath2);
+            XDocument mergedDoc = new(new XElement("Machines"));
 
-            XDocument mergedDoc = MergeDocuments(inputDoc1, inputDoc2);
+            foreach (var inputFilePath in inputFilePaths)
+            {
+                XDocument inputDoc;
+                try
+                {
+                    inputDoc = XDocument.Load(inputFilePath);
+
+                    // Validate the document structure before merging
+                    if (!IsValidStructure(inputDoc))
+                    {
+                        Console.WriteLine($"The file {inputFilePath} does not have the correct XML structure and will not be merged. Operation stopped.");
+                        return; // Stop processing further files
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"An error occurred while loading the file {inputFilePath}: {ex.Message}");
+                    return; // Stop processing if there's an error loading a file
+                }
+
+                mergedDoc = MergeDocuments(mergedDoc, inputDoc);
+            }
 
             mergedDoc.Save(outputFilePath);
             Console.WriteLine($"Merged XML saved successfully to: {outputFilePath}");
         }
 
+        private static bool IsValidStructure(XDocument doc)
+        {
+            // Check if the root element is "Machines" and if it contains at least one "Machine" child element
+            return doc.Root?.Name.LocalName == "Machines" && doc.Root.Elements("Machine").Any();
+        }
+
         public static XDocument MergeDocuments(XDocument doc1, XDocument doc2)
         {
-            if (doc1 == null && doc2 == null)
+            // Ensure that both documents have a non-null Root element before attempting to merge.
+            if (doc1.Root == null)
             {
-                throw new ArgumentNullException(nameof(doc1), "Both documents are null.");
-            }
-            else if (doc1 == null)
-            {
-                return new XDocument(doc2);
-            }
-            else if (doc2 == null)
-            {
-                return new XDocument(doc1);
+                throw new InvalidOperationException("The first document does not have a root element.");
             }
 
-            // Ensure the documents have a root before proceeding
-            if (doc1.Root == null || doc2.Root == null)
+            if (doc2.Root == null)
             {
-                throw new InvalidOperationException("One or both documents do not have a root element.");
+                throw new InvalidOperationException("The second document does not have a root element.");
             }
 
-            // Create a new XDocument to hold the merged content
-            XDocument mergedDoc = new(new XElement(doc1.Root.Name));
+            // Now that we've ensured the Root elements are not null, it's safe to proceed.
+            doc1.Root.Add(doc2.Root.Elements());
 
-            // Add elements from both documents, asserting Root is not null
-            mergedDoc.Root!.Add(doc1.Root.Elements());
-            mergedDoc.Root!.Add(doc2.Root.Elements());
-
-            return mergedDoc;
+            return doc1;
         }
+
     }
 }

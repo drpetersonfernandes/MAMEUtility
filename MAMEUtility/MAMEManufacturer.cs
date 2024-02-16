@@ -41,12 +41,6 @@ namespace MAMEUtility
                             .Trim())
                             .Replace("&amp;", "&");  // Replace &amp; with & in the filename.
 
-                        if (safeManufacturerName.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            Console.WriteLine($"Skipping {manufacturer} as it contains 'bootleg'.");
-                            continue;
-                        }
-
                         string outputFilePath = System.IO.Path.Combine(outputFolderMAMEManufacturer, $"{safeManufacturerName}.xml");
                         Console.WriteLine($"Attempting to create file for: {safeManufacturerName}.xml");
 
@@ -84,14 +78,14 @@ namespace MAMEUtility
         {
             bool predicate(XElement machine) =>
                 (machine.Element("manufacturer")?.Value ?? "") == manufacturer &&
-                !(machine.Attribute("name")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                !(machine.Element("description")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                !(machine.Element("description")?.Value.Contains("prototype", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                !(machine.Element("description")?.Value.Contains("playchoice", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                //!(machine.Attribute("name")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                //!(machine.Element("description")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                //!(machine.Element("description")?.Value.Contains("prototype", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                //!(machine.Element("description")?.Value.Contains("playchoice", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
+                //machine.Attribute("cloneof") == null &&
                 !(machine.Attribute("name")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
                 !(machine.Element("description")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                (machine.Element("driver")?.Attribute("emulation")?.Value ?? "") == "good" &&
-                machine.Attribute("cloneof") == null;
+                (machine.Element("driver")?.Attribute("emulation")?.Value ?? "") == "good";
 
             // Retrieve the matched machines
             var matchedMachines = inputDoc.Descendants("machine").Where(predicate).ToList();
@@ -103,11 +97,9 @@ namespace MAMEUtility
                     select new XElement("Machine",
                         new XElement("MachineName", RemoveExtraWhitespace(machine.Attribute("name")?.Value ?? "").Replace("&amp;", "&")),
                         new XElement("Description", RemoveExtraWhitespace(machine.Element("description")?.Value ?? "").Replace("&amp;", "&"))
-                    // Apply RemoveExtraWhitespace to any other elements as needed
                     )
                 )
             );
-
             return filteredDoc;
         }
 

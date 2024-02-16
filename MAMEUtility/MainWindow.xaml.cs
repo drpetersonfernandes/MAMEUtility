@@ -250,24 +250,17 @@ namespace MameUtility
         {
             _worker.ReportProgress(0);
 
-            Console.WriteLine("Select first XML file to merge.");
-            Microsoft.Win32.OpenFileDialog openFileDialog1 = new()
+            Console.WriteLine("Select XML files to merge. You can select multiple XML files.");
+            Microsoft.Win32.OpenFileDialog openFileDialog = new()
             {
-                Title = "Select first XML file to merge",
-                Filter = "XML files (*.xml)|*.xml"
+                Title = "Select XML files to merge",
+                Filter = "XML files (*.xml)|*.xml",
+                Multiselect = true // Enable multiple file selection
             };
 
-            Console.WriteLine("Select second XML file to merge.");
-            Microsoft.Win32.OpenFileDialog openFileDialog2 = new()
+            if (openFileDialog.ShowDialog() == true)
             {
-                Title = "Select second XML file to merge",
-                Filter = "XML files (*.xml)|*.xml"
-            };
-
-            if (openFileDialog1.ShowDialog() == true && openFileDialog2.ShowDialog() == true)
-            {
-                string inputFilePath1 = openFileDialog1.FileName;
-                string inputFilePath2 = openFileDialog2.FileName;
+                string[] inputFilePaths = openFileDialog.FileNames; // Get all selected file paths
 
                 Console.WriteLine("Put a name to your output file.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
@@ -283,7 +276,7 @@ namespace MameUtility
 
                     try
                     {
-                        MergeList.MergeAndSave(inputFilePath1, inputFilePath2, outputFilePath);
+                        MergeList.MergeAndSave(inputFilePaths, outputFilePath); // The method accept an array of file paths
                         Console.WriteLine("Merging is finished.");
 
                         _worker.ReportProgress(100);
@@ -318,38 +311,53 @@ namespace MameUtility
             {
                 string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
-                Console.WriteLine("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
-                Microsoft.Win32.OpenFileDialog openFileDialog = new()
+                Console.WriteLine("Select the destination directory for the ROMs.");
+                var destinationFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
                 {
-                    Title = "Please select the XML file(s) containing ROM information",
-                    Filter = "XML Files (*.xml)|*.xml",
-                    Multiselect = true
+                    Description = "Select the destination directory for the ROMs"
                 };
 
-                if (openFileDialog.ShowDialog() == true)
+                if (destinationFolderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string[] xmlFilePaths = openFileDialog.FileNames;
+                    string destinationDirectory = destinationFolderBrowserDialog.SelectedPath;
 
-                    try
+                    Console.WriteLine("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
+                    Microsoft.Win32.OpenFileDialog openFileDialog = new()
                     {
-                        var progress = new Progress<int>(value =>
+                        Title = "Please select the XML file(s) containing ROM information",
+                        Filter = "XML Files (*.xml)|*.xml",
+                        Multiselect = true
+                    };
+
+                    if (openFileDialog.ShowDialog() == true)
+                    {
+                        string[] xmlFilePaths = openFileDialog.FileNames;
+
+                        try
                         {
-                            ProgressBar.Value = value;
-                        });
+                            var progress = new Progress<int>(value =>
+                            {
+                                ProgressBar.Value = value;
+                            });
 
-                        await CopyRoms.CopyRomsFromXmlAsync(xmlFilePaths, sourceDirectory, progress);
-                        Console.WriteLine("ROM copy operation is finished.");
+                            await CopyRoms.CopyRomsFromXmlAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress);
+                            Console.WriteLine("ROM copy operation is finished.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"An error occurred: {ex.Message}");
+                        }
+
+                        _worker.ReportProgress(100);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Console.WriteLine($"An error occurred: {ex.Message}");
+                        Console.WriteLine("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
                     }
-
-                    _worker.ReportProgress(100);
                 }
                 else
                 {
-                    Console.WriteLine("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
+                    Console.WriteLine("You did not select a destination directory for the ROMs. Operation cancelled.");
                 }
             }
             else

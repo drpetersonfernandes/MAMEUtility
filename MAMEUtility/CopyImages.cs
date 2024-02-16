@@ -29,6 +29,14 @@ namespace MAMEUtility
         private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
             XDocument xmlDoc = XDocument.Load(xmlFilePath);
+
+            // Validate the XML document structure
+            if (!ValidateXmlStructure(xmlDoc))
+            {
+                Console.WriteLine($"The file {Path.GetFileName(xmlFilePath)} does not match the required XML structure. Operation cancelled.");
+                return; // Stop processing this XML file
+            }
+
             var machineNames = xmlDoc.Descendants("Machine")
                                      .Select(machine => machine.Element("MachineName")?.Value)
                                      .Where(name => !string.IsNullOrEmpty(name))
@@ -39,15 +47,17 @@ namespace MAMEUtility
 
             foreach (var machineName in machineNames)
             {
-                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "png");
-                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpg");
-                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpeg");
+                // Here, 'machineName' is enforced to be non-null by the previous checks, so the null-forgiving operator '!' is used.
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName!, "png");
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName!, "jpg");
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName!, "jpeg");
 
                 imagesCopied++;
                 double progressPercentage = (double)imagesCopied / totalImages * 100;
                 progress.Report((int)progressPercentage);
             }
         }
+
 
         private static Task CopyImageFileAsync(string sourceDirectory, string destinationDirectory, string? machineName, string extension)
         {
@@ -72,6 +82,18 @@ namespace MAMEUtility
                     Console.WriteLine($"File not found: {machineName}.{extension}");
                 }
             });
+        }
+
+        private static bool ValidateXmlStructure(XDocument xmlDoc)
+        {
+            // Check if the root element is "Machines" and if it contains at least one "Machine" element
+            // with both "MachineName" and "Description" child elements.
+            var isValid = xmlDoc.Root?.Name.LocalName == "Machines" &&
+                          xmlDoc.Descendants("Machine").Any(machine =>
+                              machine.Element("MachineName") != null &&
+                              machine.Element("Description") != null);
+
+            return isValid;
         }
 
     }

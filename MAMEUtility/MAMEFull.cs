@@ -9,6 +9,8 @@ namespace MAMEUtility
     {
         public static async Task CreateAndSaveMAMEFullAsync(XDocument inputDoc, string outputFilePathMAMEFull, BackgroundWorker worker)
         {
+            Console.WriteLine($"Output folder for MAME Full: {outputFilePathMAMEFull}");
+
             await Task.Run(() =>
             {
                 int totalMachines = inputDoc.Descendants("machine").Count();
@@ -25,11 +27,7 @@ namespace MAMEUtility
                     Console.WriteLine($"Processing machine: {machineName}");
 
                     machinesProcessed++;
-
-                    // Calculate progress percentage
                     progressPercentage = (int)((double)machinesProcessed / totalMachines * 100);
-
-                    // Report progress
                     worker.ReportProgress(progressPercentage);
 
                     Console.WriteLine($"Progress: {machinesProcessed}/{totalMachines}");

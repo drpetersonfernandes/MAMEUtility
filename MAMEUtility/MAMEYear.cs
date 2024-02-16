@@ -10,10 +10,10 @@ namespace MAMEUtility
     {
         public static async Task CreateAndSaveMAMEYear(XDocument inputDoc, string outputFolderMAMEYear, IProgress<int> progress)
         {
+            Console.WriteLine($"Output folder for MAME Year: {outputFolderMAMEYear}");
+
             await Task.Run(() =>
             {
-                Console.WriteLine($"Output folder for MAME Year: {outputFolderMAMEYear}");
-
                 try
                 {
                     // Extract unique years
@@ -55,7 +55,6 @@ namespace MAMEUtility
                             progress.Report((int)progressPercentage);
                         }
                     }
-
                 }
                 catch (Exception ex)
                 {
