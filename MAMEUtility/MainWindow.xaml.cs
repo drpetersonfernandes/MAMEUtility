@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Xml.Linq;
-using MessageBox = System.Windows.MessageBox;
 
 namespace MameUtility
 {
@@ -28,9 +27,27 @@ namespace MameUtility
             _worker.ProgressChanged += Worker_ProgressChanged;
         }
 
+        private void DonateButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://www.buymeacoffee.com/purelogiccode",
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show("Unable to open the link: " + ex.Message);
+            }
+        }
+
         private void About_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("MAME Utility\nPure Logic Code\nVersion 1.0.0.1", "About");
+            AboutWindow aboutWindow = new();
+            aboutWindow.ShowDialog();
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)

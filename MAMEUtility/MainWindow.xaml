@@ -8,7 +8,7 @@
     Title="MAME Utility"
     Width="565"
     Height="540"
-    mc:Ignorable="d">
+    mc:Ignorable="d" ResizeMode="CanMinimize">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -18,6 +18,7 @@
         </Grid.RowDefinitions>
 
         <Menu Grid.Row="0">
+            <MenuItem Click="DonateButton_Click" Header="_Donate" />
             <MenuItem Click="About_Click" Header="_About" />
             <MenuItem Click="Exit_Click" Header="_Exit" />
         </Menu>
