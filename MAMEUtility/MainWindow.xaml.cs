@@ -85,7 +85,7 @@ namespace MameUtility
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        await MAMEFull.CreateAndSaveMAMEFullAsync(inputDoc, outputFilePathMAMEFull, _worker);
+                        await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePathMAMEFull, _worker);
                         Console.WriteLine("Output file saved.");
                     }
                     catch (Exception ex)
