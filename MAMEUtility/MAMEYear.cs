@@ -1,16 +1,13 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.IO;
 using System.Xml.Linq;
 
 namespace MAMEUtility
 {
-    public partial class MAMEYear
+    public static class MameYear
     {
-        public static async Task CreateAndSaveMAMEYear(XDocument inputDoc, string outputFolderMAMEYear, IProgress<int> progress)
+        public static async Task CreateAndSaveMameYear(XDocument inputDoc, string outputFolderMameYear, IProgress<int> progress)
         {
-            Console.WriteLine($"Output folder for MAME Year: {outputFolderMAMEYear}");
+            Console.WriteLine($"Output folder for MAME Year: {outputFolderMameYear}");
 
             await Task.Run(() =>
             {
@@ -22,11 +19,12 @@ namespace MAMEUtility
                         .Distinct()
                         .Where(y => !string.IsNullOrEmpty(y));
 
-                    int totalYears = years.Count();
+                    var enumerable = years.ToList();
+                    int totalYears = enumerable.Count();
                     int yearsProcessed = 0;
 
                     // Iterate over each unique year
-                    foreach (var year in years)
+                    foreach (var year in enumerable)
                     {
                         if (year != null)
                         {
@@ -46,7 +44,7 @@ namespace MAMEUtility
                             );
 
                             // Save the XML document for the year
-                            string outputFilePath = Path.Combine(outputFolderMAMEYear, $"{year.Replace("?", "X")}.xml");
+                            string outputFilePath = Path.Combine(outputFolderMameYear, $"{year.Replace("?", "X")}.xml");
                             yearDoc.Save(outputFilePath);
                             Console.WriteLine($"Successfully created XML file for year {year}: {outputFilePath}");
 

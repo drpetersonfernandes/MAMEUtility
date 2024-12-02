@@ -1,23 +1,16 @@
 ﻿using MAMEUtility;
 using System.ComponentModel;
-using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Controls;
 using System.Xml.Linq;
 
 namespace MameUtility
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow
     {
         private readonly BackgroundWorker _worker;
 
-        [LibraryImport("kernel32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static partial bool AttachConsole(int dwProcessId);
-
         public MainWindow()
         {
-            AttachConsole(-1);
             InitializeComponent();
 
             _worker = new BackgroundWorker
@@ -80,12 +73,12 @@ namespace MameUtility
 
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    string outputFilePathMAMEFull = saveFileDialog.FileName;
+                    string outputFilePathMameFull = saveFileDialog.FileName;
 
                     try
                     {
                         XDocument inputDoc = XDocument.Load(inputFilePath);
-                        await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePathMAMEFull, _worker);
+                        await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePathMameFull, _worker);
                         Console.WriteLine("Output file saved.");
                     }
                     catch (Exception ex)
@@ -120,14 +113,14 @@ namespace MameUtility
                 string inputFilePath = openFileDialog.FileName;
 
                 Console.WriteLine("Select Output Folder.");
-                var folderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
+                var folderBrowserDialog = new FolderBrowserDialog
                 {
                     Description = "Select Output Folder"
                 };
 
                 if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string outputFolderMAMEManufacturer = folderBrowserDialog.SelectedPath;
+                    string outputFolderMameManufacturer = folderBrowserDialog.SelectedPath;
 
                     try
                     {
@@ -138,7 +131,7 @@ namespace MameUtility
                             ProgressBar.Value = value;
                         });
 
-                        await MAMEManufacturer.CreateAndSaveMAMEManufacturerAsync(inputDoc, outputFolderMAMEManufacturer, progress);
+                        await MAMEManufacturer.CreateAndSaveMameManufacturerAsync(inputDoc, outputFolderMameManufacturer, progress);
                         Console.WriteLine("Data extracted and saved successfully for all manufacturers.");
                     }
                     catch (Exception ex)
@@ -173,14 +166,14 @@ namespace MameUtility
                 string inputFilePath = openFileDialog.FileName;
 
                 Console.WriteLine("Select Output Folder.");
-                var folderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
+                var folderBrowserDialog = new FolderBrowserDialog
                 {
                     Description = "Select Output Folder"
                 };
 
                 if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string outputFolderMAMEYear = folderBrowserDialog.SelectedPath;
+                    string outputFolderMameYear = folderBrowserDialog.SelectedPath;
 
                     try
                     {
@@ -191,7 +184,7 @@ namespace MameUtility
                             ProgressBar.Value = value;
                         });
 
-                        await Task.Run(() => MAMEYear.CreateAndSaveMAMEYear(inputDoc, outputFolderMAMEYear, progress));
+                        await Task.Run(() => MameYear.CreateAndSaveMameYear(inputDoc, outputFolderMameYear, progress));
                         Console.WriteLine("XML files created successfully for all years.");
                     }
                     catch (Exception ex)
@@ -233,7 +226,7 @@ namespace MameUtility
 
                 if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string outputFolderMAMESourcefile = folderBrowserDialog.SelectedPath;
+                    string outputFolderMameSourcefile = folderBrowserDialog.SelectedPath;
 
                     try
                     {
@@ -244,7 +237,7 @@ namespace MameUtility
                             ProgressBar.Value = value;
                         });
 
-                        await MAMESourcefile.CreateAndSaveMAMESourcefileAsync(inputDoc, outputFolderMAMESourcefile, progress);
+                        await MameSourcefile.CreateAndSaveMameSourcefileAsync(inputDoc, outputFolderMameSourcefile, progress);
                         Console.WriteLine("Data extracted and saved successfully for all source files.");
                     }
                     catch (Exception ex)
@@ -319,7 +312,7 @@ namespace MameUtility
             _worker.ReportProgress(0);
 
             Console.WriteLine("Select the source directory containing the ROMs.");
-            var sourceFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
+            var sourceFolderBrowserDialog = new FolderBrowserDialog
             {
                 Description = "Select the source directory containing the ROMs"
             };
@@ -329,7 +322,7 @@ namespace MameUtility
                 string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
                 Console.WriteLine("Select the destination directory for the ROMs.");
-                var destinationFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
+                var destinationFolderBrowserDialog = new FolderBrowserDialog
                 {
                     Description = "Select the destination directory for the ROMs"
                 };
@@ -388,7 +381,7 @@ namespace MameUtility
             _worker.ReportProgress(0);
 
             Console.WriteLine("Select the source directory containing the images.");
-            var sourceFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
+            var sourceFolderBrowserDialog = new FolderBrowserDialog
             {
                 Description = "Select the source directory containing the images"
             };
@@ -398,7 +391,7 @@ namespace MameUtility
                 string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
                 Console.WriteLine("Select the destination directory for the images.");
-                var destinationFolderBrowserDialog = new System.Windows.Forms.FolderBrowserDialog
+                var destinationFolderBrowserDialog = new FolderBrowserDialog
                 {
                     Description = "Select the destination directory for the images"
                 };
@@ -458,5 +451,9 @@ namespace MameUtility
             }
         }
 
+        private void CreateMAMESoftwareList_Click(object sender, RoutedEventArgs e)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

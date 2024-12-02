@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace MAMEUtility
 {
-    public partial class AboutWindow : Window
+    public partial class AboutWindow
     {
         public AboutWindow()
         {

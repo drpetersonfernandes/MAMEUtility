@@ -1,15 +1,12 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 
 namespace MAMEUtility
 {
     public partial class MAMEManufacturer
     {
-        public static async Task CreateAndSaveMAMEManufacturerAsync(XDocument inputDoc, string outputFolderMAMEManufacturer, IProgress<int> progress)
+        public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress)
         {
-            Console.WriteLine($"Output folder for MAME Manufacturer: {outputFolderMAMEManufacturer}");
+            Console.WriteLine($"Output folder for MAME Manufacturer: {outputFolderMameManufacturer}");
 
             try
             {
@@ -19,11 +16,12 @@ namespace MAMEUtility
                     .Distinct()
                     .Where(m => !string.IsNullOrEmpty(m));
 
-                int totalManufacturers = manufacturers.Count();
+                var enumerable = manufacturers.ToList();
+                int totalManufacturers = enumerable.Count();
                 int manufacturersProcessed = 0;
 
                 // Iterate over each manufacturer and create an XML for each
-                foreach (var manufacturer in manufacturers)
+                foreach (var manufacturer in enumerable)
                 {
                     if (manufacturer != null)
                     {
@@ -41,7 +39,7 @@ namespace MAMEUtility
                             .Trim())
                             .Replace("&amp;", "&");  // Replace &amp; with & in the filename.
 
-                        string outputFilePath = System.IO.Path.Combine(outputFolderMAMEManufacturer, $"{safeManufacturerName}.xml");
+                        string outputFilePath = System.IO.Path.Combine(outputFolderMameManufacturer, $"{safeManufacturerName}.xml");
                         Console.WriteLine($"Attempting to create file for: {safeManufacturerName}.xml");
 
                         await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, manufacturer, safeManufacturerName);
@@ -76,7 +74,7 @@ namespace MAMEUtility
 
         private static XDocument CreateFilteredDocument(XDocument inputDoc, string manufacturer)
         {
-            bool predicate(XElement machine) =>
+            bool Predicate(XElement machine) =>
                 (machine.Element("manufacturer")?.Value ?? "") == manufacturer &&
                 //!(machine.Attribute("name")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
                 //!(machine.Element("description")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
@@ -88,7 +86,7 @@ namespace MAMEUtility
                 (machine.Element("driver")?.Attribute("emulation")?.Value ?? "") == "good";
 
             // Retrieve the matched machines
-            var matchedMachines = inputDoc.Descendants("machine").Where(predicate).ToList();
+            var matchedMachines = inputDoc.Descendants("machine").Where(Predicate).ToList();
 
             // Create a new XML document for machines based on the matched machines
             XDocument filteredDoc = new(

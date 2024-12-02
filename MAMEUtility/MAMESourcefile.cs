@@ -3,11 +3,11 @@ using System.Xml.Linq;
 
 namespace MAMEUtility
 {
-    public partial class MAMESourcefile
+    public static class MameSourcefile
     {
-        public static async Task CreateAndSaveMAMESourcefileAsync(XDocument inputDoc, string outputFolderMAMESourcefile, IProgress<int> progress)
+        public static async Task CreateAndSaveMameSourcefileAsync(XDocument inputDoc, string outputFolderMameSourcefile, IProgress<int> progress)
         {
-            Console.WriteLine($"Output folder for MAME Sourcefile: {outputFolderMAMESourcefile}");
+            Console.WriteLine($"Output folder for MAME Sourcefile: {outputFolderMameSourcefile}");
 
             try
             {
@@ -17,11 +17,12 @@ namespace MAMEUtility
                     .Distinct()
                     .Where(s => !string.IsNullOrEmpty(s));
 
-                int totalSourceFiles = sourceFiles.Count();
+                var enumerable = sourceFiles.ToList();
+                int totalSourceFiles = enumerable.Count();
                 int sourceFilesProcessed = 0;
 
                 // Iterate over each source file and create an XML for each
-                foreach (var sourceFile in sourceFiles)
+                foreach (var sourceFile in enumerable)
                 {
                     // Check if the source file name is valid
                     if (string.IsNullOrWhiteSpace(sourceFile))
@@ -37,7 +38,7 @@ namespace MAMEUtility
                     safeSourceFileName = ReplaceInvalidFileNameChars(safeSourceFileName);
 
                     // Construct the output file path
-                    string outputFilePath = Path.Combine(outputFolderMAMESourcefile, $"{safeSourceFileName}.xml");
+                    string outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{safeSourceFileName}.xml");
 
                     // Create and save the filtered document
                     await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, sourceFile);
@@ -57,14 +58,14 @@ namespace MAMEUtility
         private static async Task CreateAndSaveFilteredDocumentAsync(XDocument inputDoc, string outputPath, string sourceFile)
         {
             // Filtering condition based on the source file
-            bool predicate(XElement machine) =>
+            bool Predicate(XElement machine) =>
                 (string?)machine.Attribute("sourcefile") == sourceFile;
 
             // Create a new XML document for machines based on the predicate
             XDocument filteredDoc = new(
                 new XElement("Machines",
                     from machine in inputDoc.Descendants("machine")
-                    where predicate(machine)
+                    where Predicate(machine)
                     select new XElement("Machine",
                         new XElement("MachineName", machine.Attribute("name")?.Value),
                         new XElement("Description", machine.Element("description")?.Value)

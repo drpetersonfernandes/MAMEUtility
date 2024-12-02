@@ -1,5 +1,4 @@
-﻿using System;
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 
 namespace MameUtility
 {
@@ -42,7 +41,7 @@ namespace MameUtility
             return doc.Root?.Name.LocalName == "Machines" && doc.Root.Elements("Machine").Any();
         }
 
-        public static XDocument MergeDocuments(XDocument doc1, XDocument doc2)
+        private static XDocument MergeDocuments(XDocument doc1, XDocument doc2)
         {
             // Ensure that both documents have a non-null Root element before attempting to merge.
             if (doc1.Root == null)
