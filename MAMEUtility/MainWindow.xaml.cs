@@ -463,7 +463,51 @@ namespace MameUtility
 
         private void CreateMAMESoftwareList_Click(object sender, RoutedEventArgs e)
         {
-            throw new NotImplementedException();
+            Console.WriteLine("Select the folder containing XML files to process.");
+            using var folderBrowserDialog = new FolderBrowserDialog();
+            folderBrowserDialog.Description = "Select the folder containing XML files to process";
+
+            if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                string inputFolderPath = folderBrowserDialog.SelectedPath;
+
+                Console.WriteLine("Choose a location to save the consolidated output XML file.");
+                Microsoft.Win32.SaveFileDialog saveFileDialog = new()
+                {
+                    Title = "Save Consolidated XML File",
+                    Filter = "XML Files (*.xml)|*.xml",
+                    FileName = "MAMESoftwareList.xml"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    string outputFilePath = saveFileDialog.FileName;
+
+                    try
+                    {
+                        var progress = new Progress<int>(value =>
+                        {
+                            ProgressBar.Value = value;
+                        });
+
+                        MameSoftwareList.CreateAndSaveSoftwareList(inputFolderPath, outputFilePath, progress, _logWindow);
+                        Console.WriteLine("Consolidated XML file created successfully.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("An error occurred: " + ex.Message);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No output file specified. Operation cancelled.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No folder selected. Operation cancelled.");
+            }
         }
+
     }
 }
