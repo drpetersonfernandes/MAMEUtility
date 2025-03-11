@@ -283,7 +283,7 @@ namespace MameUtility
             {
                 string[] inputFilePaths = openFileDialog.FileNames; // Get all selected file paths
 
-                Log("Put a name to your output files.");
+                Log("Select where to save the merged XML file.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
                 {
                     Title = "Save Merged XML",
@@ -294,7 +294,7 @@ namespace MameUtility
                 if (saveFileDialog.ShowDialog() == true)
                 {
                     var outputXmlPath = saveFileDialog.FileName;
-
+            
                     // Create DAT filename based on XML filename (replace extension)
                     var outputDatPath = Path.ChangeExtension(outputXmlPath, ".dat");
 
@@ -302,7 +302,7 @@ namespace MameUtility
                     {
                         // Use the new method that creates both XML and DAT files
                         MergeList.MergeAndSaveBoth(inputFilePaths, outputXmlPath, outputDatPath);
-                        Log("Merging is finished. Created both XML and DAT files.");
+                        Log($"Merging completed. Created XML file ({outputXmlPath}) and DAT file ({outputDatPath}).");
 
                         _worker.ReportProgress(100);
                     }
@@ -313,7 +313,7 @@ namespace MameUtility
                 }
                 else
                 {
-                    Log("No output file specified for merged files. Operation cancelled.");
+                    Log("No output file specified for merged XML. Operation cancelled.");
                 }
             }
             else

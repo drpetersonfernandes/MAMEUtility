@@ -6,7 +6,7 @@ namespace MameUtility;
 
 public static class MergeList
 {
-    // Original method to merge and save as XML
+    // Traditional method to merge and save as XML only (kept for backward compatibility)
     public static void MergeAndSave(string[] inputFilePaths, string outputFilePath)
     {
         var mergedDoc = MergeDocumentsFromPaths(inputFilePaths);
@@ -109,7 +109,7 @@ public static class MergeList
         return doc1;
     }
 
-    // New method to convert XML to a list of MachineInfo objects
+    // Convert XML to a list of machines compatible with SimpleLauncher's MameConfig
     private static List<MachineInfo> ConvertXmlToMachines(XDocument doc)
     {
         var machines = new List<MachineInfo>();
@@ -127,14 +127,14 @@ public static class MergeList
         return machines;
     }
 
-    // New method to save machines to MessagePack DAT file
+    // Save machines to MessagePack DAT file
     private static void SaveMachinesToDat(List<MachineInfo> machines, string outputFilePath)
     {
         try
         {
-            // Serialize the machine's list to a MessagePack binary array
+            // Serialize the machines' list to a MessagePack binary array
             var binary = MessagePackSerializer.Serialize(machines);
-
+            
             // Write the binary data to the output file
             File.WriteAllBytes(outputFilePath, binary);
         }
@@ -143,35 +143,15 @@ public static class MergeList
             Console.WriteLine($"Error saving DAT file: {ex.Message}");
         }
     }
-
-    public static List<MachineInfo> ReadMachinesFromDat(string filePath)
-    {
-        try
-        {
-            // Read the binary data from the file
-            var binary = File.ReadAllBytes(filePath);
-
-            // Deserialize the binary data back to a list of MachineInfo objects
-            var machines = MessagePackSerializer.Deserialize<List<MachineInfo>>(binary);
-
-            Console.WriteLine($"Successfully read {machines.Count} machines from DAT file: {filePath}");
-            return machines;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error reading DAT file: {ex.Message}");
-            return new List<MachineInfo>();
-        }
-    }
 }
 
-// MessagePack-enabled model class for machine information
+// This class matches the structure in SimpleLauncher.MameConfig
 [MessagePackObject]
 public class MachineInfo
 {
     [Key(0)]
     public string MachineName { get; set; } = string.Empty;
-
+    
     [Key(1)]
     public string Description { get; set; } = string.Empty;
 }
