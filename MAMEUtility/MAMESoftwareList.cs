@@ -21,7 +21,7 @@ public static class MameSoftwareList
         }
 
         var softwareList = new List<XElement>();
-        int processedCount = 0;
+        var processedCount = 0;
 
         foreach (var file in files)
         {

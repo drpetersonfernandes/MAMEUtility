@@ -1,5 +1,6 @@
 ﻿using MAMEUtility;
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Xml.Linq;
 
@@ -19,12 +20,12 @@ namespace MameUtility
                 WorkerReportsProgress = true
             };
             _worker.ProgressChanged += Worker_ProgressChanged;
-            
+
             _logWindow = new LogWindow();
             _logWindow.Show();
 
         }
-        
+
         private void Log(string message)
         {
             _logWindow.AppendLog(message);
@@ -71,7 +72,7 @@ namespace MameUtility
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string inputFilePath = openFileDialog.FileName;
+                var inputFilePath = openFileDialog.FileName;
 
                 Log("Put a name to your output file.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
@@ -83,11 +84,11 @@ namespace MameUtility
 
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    string outputFilePathMameFull = saveFileDialog.FileName;
+                    var outputFilePathMameFull = saveFileDialog.FileName;
 
                     try
                     {
-                        XDocument inputDoc = XDocument.Load(inputFilePath);
+                        var inputDoc = XDocument.Load(inputFilePath);
                         await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePathMameFull, _worker);
                         Log("Output file saved.");
                     }
@@ -120,7 +121,7 @@ namespace MameUtility
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string inputFilePath = openFileDialog.FileName;
+                var inputFilePath = openFileDialog.FileName;
 
                 Log("Select Output Folder.");
                 var folderBrowserDialog = new FolderBrowserDialog
@@ -130,11 +131,11 @@ namespace MameUtility
 
                 if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string outputFolderMameManufacturer = folderBrowserDialog.SelectedPath;
+                    var outputFolderMameManufacturer = folderBrowserDialog.SelectedPath;
 
                     try
                     {
-                        XDocument inputDoc = XDocument.Load(inputFilePath);
+                        var inputDoc = XDocument.Load(inputFilePath);
 
                         var progress = new Progress<int>(value =>
                         {
@@ -173,7 +174,7 @@ namespace MameUtility
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string inputFilePath = openFileDialog.FileName;
+                var inputFilePath = openFileDialog.FileName;
 
                 Log("Select Output Folder.");
                 var folderBrowserDialog = new FolderBrowserDialog
@@ -183,11 +184,11 @@ namespace MameUtility
 
                 if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string outputFolderMameYear = folderBrowserDialog.SelectedPath;
+                    var outputFolderMameYear = folderBrowserDialog.SelectedPath;
 
                     try
                     {
-                        XDocument inputDoc = XDocument.Load(inputFilePath);
+                        var inputDoc = XDocument.Load(inputFilePath);
 
                         var progress = new Progress<int>(value =>
                         {
@@ -226,7 +227,7 @@ namespace MameUtility
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string inputFilePath = openFileDialog.FileName;
+                var inputFilePath = openFileDialog.FileName;
 
                 Log("Select Output Folder.");
                 FolderBrowserDialog folderBrowserDialog = new()
@@ -236,11 +237,11 @@ namespace MameUtility
 
                 if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string outputFolderMameSourcefile = folderBrowserDialog.SelectedPath;
+                    var outputFolderMameSourcefile = folderBrowserDialog.SelectedPath;
 
                     try
                     {
-                        XDocument inputDoc = XDocument.Load(inputFilePath);
+                        var inputDoc = XDocument.Load(inputFilePath);
 
                         var progress = new Progress<int>(value =>
                         {
@@ -282,7 +283,7 @@ namespace MameUtility
             {
                 string[] inputFilePaths = openFileDialog.FileNames; // Get all selected file paths
 
-                Log("Put a name to your output file.");
+                Log("Put a name to your output files.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
                 {
                     Title = "Save Merged XML",
@@ -292,12 +293,16 @@ namespace MameUtility
 
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    string outputFilePath = saveFileDialog.FileName;
+                    var outputXmlPath = saveFileDialog.FileName;
+
+                    // Create DAT filename based on XML filename (replace extension)
+                    var outputDatPath = Path.ChangeExtension(outputXmlPath, ".dat");
 
                     try
                     {
-                        MergeList.MergeAndSave(inputFilePaths, outputFilePath); // The method accept an array of file paths
-                        Log("Merging is finished.");
+                        // Use the new method that creates both XML and DAT files
+                        MergeList.MergeAndSaveBoth(inputFilePaths, outputXmlPath, outputDatPath);
+                        Log("Merging is finished. Created both XML and DAT files.");
 
                         _worker.ReportProgress(100);
                     }
@@ -308,7 +313,7 @@ namespace MameUtility
                 }
                 else
                 {
-                    Log("No output file specified for merged XML. Operation cancelled.");
+                    Log("No output file specified for merged files. Operation cancelled.");
                 }
             }
             else
@@ -329,7 +334,7 @@ namespace MameUtility
 
             if (sourceFolderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
+                var sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
                 Log("Select the destination directory for the ROMs.");
                 var destinationFolderBrowserDialog = new FolderBrowserDialog
@@ -339,7 +344,7 @@ namespace MameUtility
 
                 if (destinationFolderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string destinationDirectory = destinationFolderBrowserDialog.SelectedPath;
+                    var destinationDirectory = destinationFolderBrowserDialog.SelectedPath;
 
                     Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
                     Microsoft.Win32.OpenFileDialog openFileDialog = new()
@@ -398,7 +403,7 @@ namespace MameUtility
 
             if (sourceFolderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                string sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
+                var sourceDirectory = sourceFolderBrowserDialog.SelectedPath;
 
                 Log("Select the destination directory for the images.");
                 var destinationFolderBrowserDialog = new FolderBrowserDialog
@@ -408,7 +413,7 @@ namespace MameUtility
 
                 if (destinationFolderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string destinationDirectory = destinationFolderBrowserDialog.SelectedPath;
+                    var destinationDirectory = destinationFolderBrowserDialog.SelectedPath;
 
                     Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
                     Microsoft.Win32.OpenFileDialog openFileDialog = new()
@@ -469,7 +474,7 @@ namespace MameUtility
 
             if (folderBrowserDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                string inputFolderPath = folderBrowserDialog.SelectedPath;
+                var inputFolderPath = folderBrowserDialog.SelectedPath;
 
                 Console.WriteLine("Choose a location to save the consolidated output XML file.");
                 Microsoft.Win32.SaveFileDialog saveFileDialog = new()
@@ -481,7 +486,7 @@ namespace MameUtility
 
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    string outputFilePath = saveFileDialog.FileName;
+                    var outputFilePath = saveFileDialog.FileName;
 
                     try
                     {

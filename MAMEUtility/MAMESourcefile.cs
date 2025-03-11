@@ -18,8 +18,8 @@ namespace MAMEUtility
                     .Where(s => !string.IsNullOrEmpty(s));
 
                 var enumerable = sourceFiles.ToList();
-                int totalSourceFiles = enumerable.Count();
-                int sourceFilesProcessed = 0;
+                var totalSourceFiles = enumerable.Count();
+                var sourceFilesProcessed = 0;
 
                 // Iterate over each source file and create an XML for each
                 foreach (var sourceFile in enumerable)
@@ -32,19 +32,19 @@ namespace MAMEUtility
                     }
 
                     // Remove the ".cpp" extension from the source file name
-                    string safeSourceFileName = Path.GetFileNameWithoutExtension(sourceFile);
+                    var safeSourceFileName = Path.GetFileNameWithoutExtension(sourceFile);
 
                     // Replace or remove invalid characters from the file name
                     safeSourceFileName = ReplaceInvalidFileNameChars(safeSourceFileName);
 
                     // Construct the output file path
-                    string outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{safeSourceFileName}.xml");
+                    var outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{safeSourceFileName}.xml");
 
                     // Create and save the filtered document
                     await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, sourceFile);
 
                     sourceFilesProcessed++;
-                    double progressPercentage = (double)sourceFilesProcessed / totalSourceFiles * 100;
+                    var progressPercentage = (double)sourceFilesProcessed / totalSourceFiles * 100;
                     progress.Report((int)progressPercentage);
                 }
 
@@ -87,8 +87,8 @@ namespace MAMEUtility
 
         private static string ReplaceInvalidFileNameChars(string fileName)
         {
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            foreach (char invalidChar in invalidChars)
+            var invalidChars = Path.GetInvalidFileNameChars();
+            foreach (var invalidChar in invalidChars)
             {
                 fileName = fileName.Replace(invalidChar, '_');
             }

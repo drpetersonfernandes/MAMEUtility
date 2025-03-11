@@ -11,14 +11,14 @@ namespace MAMEUtility
 
             await Task.Run(() =>
             {
-                int totalMachines = inputDoc.Descendants("machine").Count();
-                int machinesProcessed = 0;
+                var totalMachines = inputDoc.Descendants("machine").Count();
+                var machinesProcessed = 0;
 
                 Console.WriteLine($"Total machines: {totalMachines}");
 
                 foreach (var machine in inputDoc.Descendants("machine"))
                 {
-                    string? machineName = machine.Attribute("name")?.Value;
+                    var machineName = machine.Attribute("name")?.Value;
 
                     Console.WriteLine($"Processing machine: {machineName}");
 

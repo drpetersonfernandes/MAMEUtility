@@ -20,8 +20,8 @@ namespace MAMEUtility
                         .Where(y => !string.IsNullOrEmpty(y));
 
                     var enumerable = years.ToList();
-                    int totalYears = enumerable.Count();
-                    int yearsProcessed = 0;
+                    var totalYears = enumerable.Count();
+                    var yearsProcessed = 0;
 
                     // Iterate over each unique year
                     foreach (var year in enumerable)
@@ -44,12 +44,12 @@ namespace MAMEUtility
                             );
 
                             // Save the XML document for the year
-                            string outputFilePath = Path.Combine(outputFolderMameYear, $"{year.Replace("?", "X")}.xml");
+                            var outputFilePath = Path.Combine(outputFolderMameYear, $"{year.Replace("?", "X")}.xml");
                             yearDoc.Save(outputFilePath);
                             Console.WriteLine($"Successfully created XML file for year {year}: {outputFilePath}");
 
                             yearsProcessed++;
-                            double progressPercentage = (double)yearsProcessed / totalYears * 100;
+                            var progressPercentage = (double)yearsProcessed / totalYears * 100;
                             progress.Report((int)progressPercentage);
                         }
                     }

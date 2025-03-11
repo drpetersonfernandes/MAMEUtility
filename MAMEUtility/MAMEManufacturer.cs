@@ -17,15 +17,15 @@ namespace MAMEUtility
                     .Where(m => !string.IsNullOrEmpty(m));
 
                 var enumerable = manufacturers.ToList();
-                int totalManufacturers = enumerable.Count();
-                int manufacturersProcessed = 0;
+                var totalManufacturers = enumerable.Count();
+                var manufacturersProcessed = 0;
 
                 // Iterate over each manufacturer and create an XML for each
                 foreach (var manufacturer in enumerable)
                 {
                     if (manufacturer != null)
                     {
-                        string safeManufacturerName = RemoveExtraWhitespace(manufacturer
+                        var safeManufacturerName = RemoveExtraWhitespace(manufacturer
                             .Replace("<", "")
                             .Replace(">", "")
                             .Replace(":", "")
@@ -39,13 +39,13 @@ namespace MAMEUtility
                             .Trim())
                             .Replace("&amp;", "&");  // Replace &amp; with & in the filename.
 
-                        string outputFilePath = System.IO.Path.Combine(outputFolderMameManufacturer, $"{safeManufacturerName}.xml");
+                        var outputFilePath = System.IO.Path.Combine(outputFolderMameManufacturer, $"{safeManufacturerName}.xml");
                         Console.WriteLine($"Attempting to create file for: {safeManufacturerName}.xml");
 
                         await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, manufacturer, safeManufacturerName);
 
                         manufacturersProcessed++;
-                        double progressPercentage = (double)manufacturersProcessed / totalManufacturers * 100;
+                        var progressPercentage = (double)manufacturersProcessed / totalManufacturers * 100;
                         progress.Report((int)progressPercentage);
                     }
                 }
@@ -59,7 +59,7 @@ namespace MAMEUtility
 
         private static async Task CreateAndSaveFilteredDocumentAsync(XDocument inputDoc, string outputPath, string manufacturer, string safeManufacturerName)
         {
-            XDocument filteredDoc = CreateFilteredDocument(inputDoc, manufacturer);
+            var filteredDoc = CreateFilteredDocument(inputDoc, manufacturer);
 
             try
             {

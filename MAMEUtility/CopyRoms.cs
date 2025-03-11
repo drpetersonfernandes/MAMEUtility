@@ -7,16 +7,16 @@ namespace MAMEUtility
     {
         public static async Task CopyRomsFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
-            int totalFiles = xmlFilePaths.Length;
-            int filesProcessed = 0;
+            var totalFiles = xmlFilePaths.Length;
+            var filesProcessed = 0;
 
-            foreach (string xmlFilePath in xmlFilePaths)
+            foreach (var xmlFilePath in xmlFilePaths)
             {
                 try
                 {
                     await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress);
                     filesProcessed++;
-                    double progressPercentage = (double)filesProcessed / totalFiles * 100;
+                    var progressPercentage = (double)filesProcessed / totalFiles * 100;
                     progress.Report((int)progressPercentage);
                 }
                 catch (Exception ex)
@@ -28,7 +28,7 @@ namespace MAMEUtility
 
         private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
-            XDocument xmlDoc = XDocument.Load(xmlFilePath);
+            var xmlDoc = XDocument.Load(xmlFilePath);
 
             // Validate the XML document structure
             if (!ValidateXmlStructure(xmlDoc))
@@ -42,15 +42,15 @@ namespace MAMEUtility
                                      .Where(name => !string.IsNullOrEmpty(name))
                                      .ToList();
 
-            int totalRoms = machineNames.Count;
-            int romsProcessed = 0;
+            var totalRoms = machineNames.Count;
+            var romsProcessed = 0;
 
             foreach (var machineName in machineNames)
             {
                 await CopyRomAsync(sourceDirectory, destinationDirectory, machineName!);
 
                 romsProcessed++;
-                double progressPercentage = (double)romsProcessed / totalRoms * 100;
+                var progressPercentage = (double)romsProcessed / totalRoms * 100;
                 progress.Report((int)progressPercentage);
             }
         }
@@ -62,8 +62,8 @@ namespace MAMEUtility
                 Console.WriteLine($"Attempting to copy ROM for machine: {machineName}");
                 try
                 {
-                    string sourceFile = Path.Combine(sourceDirectory, machineName + ".zip");
-                    string destinationFile = Path.Combine(destinationDirectory, machineName + ".zip");
+                    var sourceFile = Path.Combine(sourceDirectory, machineName + ".zip");
+                    var destinationFile = Path.Combine(destinationDirectory, machineName + ".zip");
 
                     Console.WriteLine($"Source file path: {sourceFile}");
                     Console.WriteLine($"Destination file path: {destinationFile}");

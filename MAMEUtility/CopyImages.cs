@@ -7,16 +7,16 @@ namespace MAMEUtility
     {
         public static async Task CopyImagesFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
-            int totalFiles = xmlFilePaths.Length;
-            int filesCopied = 0;
+            var totalFiles = xmlFilePaths.Length;
+            var filesCopied = 0;
 
-            foreach (string xmlFilePath in xmlFilePaths)
+            foreach (var xmlFilePath in xmlFilePaths)
             {
                 try
                 {
                     await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress);
                     filesCopied++;
-                    double progressPercentage = (double)filesCopied / totalFiles * 100;
+                    var progressPercentage = (double)filesCopied / totalFiles * 100;
                     progress.Report((int)progressPercentage);
                 }
                 catch (Exception ex)
@@ -28,7 +28,7 @@ namespace MAMEUtility
 
         private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
         {
-            XDocument xmlDoc = XDocument.Load(xmlFilePath);
+            var xmlDoc = XDocument.Load(xmlFilePath);
 
             // Validate the XML document structure
             if (!ValidateXmlStructure(xmlDoc))
@@ -42,8 +42,8 @@ namespace MAMEUtility
                                      .Where(name => !string.IsNullOrEmpty(name))
                                      .ToList();
 
-            int totalImages = machineNames.Count;
-            int imagesCopied = 0;
+            var totalImages = machineNames.Count;
+            var imagesCopied = 0;
 
             foreach (var machineName in machineNames)
             {
@@ -53,7 +53,7 @@ namespace MAMEUtility
                 await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName!, "jpeg");
 
                 imagesCopied++;
-                double progressPercentage = (double)imagesCopied / totalImages * 100;
+                var progressPercentage = (double)imagesCopied / totalImages * 100;
                 progress.Report((int)progressPercentage);
             }
         }
@@ -67,8 +67,8 @@ namespace MAMEUtility
                 return Task.CompletedTask;
             }
 
-            string sourceFile = Path.Combine(sourceDirectory, machineName + "." + extension);
-            string destinationFile = Path.Combine(destinationDirectory, machineName + "." + extension);
+            var sourceFile = Path.Combine(sourceDirectory, machineName + "." + extension);
+            var destinationFile = Path.Combine(destinationDirectory, machineName + "." + extension);
 
             return Task.Run(() =>
             {
