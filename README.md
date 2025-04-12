@@ -1,51 +1,55 @@
 # MAME Utility
 
-The MAME Utility is a comprehensive Windows desktop application designed to manage the full driver information of the MAME (Multiple Arcade Machine Emulator) in XML format, which is available on the [MAME](https://www.mamedev.org/release.html) website. It can generate multiple simplified (and smaller) XML subsets and can also copy ROMs and image files based on the generated XML.  
-The tool is built using C#, the WPF (Windows Presentation Foundation) framework, and the .NET Core framework.
+## Overview
+
+MAME Utility is a tool designed to help manage and organize MAME (Multiple Arcade Machine Emulator) data. It provides functionalities to create lists based on various criteria, merge lists, and copy ROMs and images.
+
+![Screenshot](screenshot1.png)
 
 ## Features
 
-- **MAME List Generation**: Users can create simplified lists of MAME games, including full lists, manufacturer-specific lists, year-specific lists, and source file-specific lists.
-- **List Merging**: Combines multiple XML lists into a single, consolidated list. This is particularly useful for users who maintain separate lists for different categories or purposes and wish to unify them.
-- **ROM Management**: Allows copying of ROMs from a source directory to a destination directory based on game information contained in specified XML files. This feature simplifies the process of organizing and managing MAME ROM collections.
-- **Image Management**: Similar to ROM management, this feature facilitates copying of game images (e.g., screenshots, marquee images) from a source directory to a destination directory, guided by game information in XML files.
-- **Progress Tracking**: The application includes a progress bar that provides visual feedback during long-running operations, helping users stay informed about the process.
+-   **Create MAME Lists**: Generate XML lists based on:
+    -   Full driver information
+    -   Manufacturer
+    -   Year
+    -   Source file
+    -   Software list
+-   **Merge Lists**: Combine multiple XML lists into a single XML and DAT file.  The DAT file is in MessagePack format, compatible with SimpleLauncher's MameConfig.
+-   **Copy ROMs**: Copy ROM files (ZIP) from a source directory to a destination directory based on an XML list.
+-   **Copy Images**: Copy image files (PNG, JPG, JPEG) from a source directory to a destination directory based on an XML list.
+-   **Logging**: Provides a log window to display the progress and any errors encountered during operations.
+-   **Progress Tracking**: A progress bar provides visual feedback on long-running operations.
 
-## Getting Started
+## Usage
+
+1.  **Create Lists**:
+    -   Select the desired list type from the main window (e.g., "Create MAME Manufacturer List").
+    -   Choose the MAME full driver information XML file as input. You can download this from the MAME website.
+    -   Specify the output folder or file path for the generated list.
+2.  **Merge Lists**:
+    -   Click the "Merge Lists" button.
+    -   Select multiple XML files to merge. The application supports both "Machines" and "Softwares" XML formats.
+    -   Choose the output file path for the merged XML and DAT files.
+3.  **Copy ROMs/Images**:
+    -   Click the "Copy Roms" or "Copy Images" button.
+    -   Select the source directory containing the ROMs or images.
+    -   Select the destination directory to copy the files to.
+    -   Choose the XML file(s) containing ROM or image information.
 
 ### Prerequisites
 
 - Windows 7 or later.
-- .NET Core runtime installed.
+- .NET 9.0 Runtime.
 - MAME ROMs and images you wish to manage.
 - The MAME full driver information in XML format (available from the official [MAME](https://www.mamedev.org/release.html) website).
 
-## Usage
+## License
 
-Upon launching the MAME Utility, users are greeted by a straightforward interface divided into sections for each of its core functionalities:
-
-1. **Generate Lists**: Create a full list, manufacturer list, year list, or source file list of MAME games.
-2. **Merge Lists**: Select multiple XML files to merge into a single file.
-3. **Copy ROMs/Images**: Choose the source and destination directories, along with the XML files containing ROM or image information, to copy the corresponding files.
-
-## Screenshots
-
-![Screenshot](screenshot1.png)
-
-![Screenshot](screenshot2.png)
+This project is licensed under the terms of the [GNU General Public License v3.0](LICENSE.txt). See `LICENSE.txt` for more information.
 
 ## Support
 
-If you like the software, please give us a star.<br>
-Consider [donating](https://www.purelogiccode.com/donate) to support the project or simply to express your gratitude!
-
-## License
-
-Distributed under the GPL-3.0 License. See `LICENSE` for more information.
-
-## Acknowledgments
-
-This tool would not be possible without the extensive documentation and resources provided by the MAME project. Special thanks go to the MAME developers for their dedication to preserving the history of arcade games.
+If you like the software, please give us a star.  Consider [donating](https://www.purelogiccode.com/donate) to support the project or simply to express your gratitude!
 
 ## Developer
 
