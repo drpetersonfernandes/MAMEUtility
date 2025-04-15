@@ -358,5 +358,7 @@ public class LogService : ILogService, IDisposable
     public void Dispose()
     {
         _logFileSemaphore.Dispose();
+
+        GC.SuppressFinalize(this);
     }
 }
