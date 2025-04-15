@@ -11,8 +11,8 @@
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
     <PackageIcon>icon2.png</PackageIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <AssemblyVersion>1.1</AssemblyVersion>
-    <FileVersion>1.1</FileVersion>
+    <AssemblyVersion>1.2</AssemblyVersion>
+    <FileVersion>1.2</FileVersion>
     <LangVersion>13</LangVersion>
     <IsPackable>false</IsPackable>
     <NeutralLanguage>en-US</NeutralLanguage>
