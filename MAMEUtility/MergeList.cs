@@ -8,25 +8,23 @@ namespace MameUtility;
 public static class MergeList
 {
     // Save as both XML and DAT files
-    public static void MergeAndSaveBoth(string[] inputFilePaths, string xmlOutputPath, string datOutputPath)
+    public static void MergeAndSaveBoth(string[] inputFilePaths, string xmlOutputPath, string datOutputPath, LogWindow logWindow)
     {
-        var mergedDoc = MergeDocumentsFromPaths(inputFilePaths);
-        if (mergedDoc == null) return;
+        if (inputFilePaths.Length == 0)
+        {
+            logWindow.AppendLog("No input files provided. Operation cancelled.");
+            return;
+        }
 
-        // Save as XML
-        mergedDoc.Save(xmlOutputPath);
-        Console.WriteLine($"Merged XML saved successfully to: {xmlOutputPath}");
+        logWindow.AppendLog($"Starting merge operation with {inputFilePaths.Length} files.");
 
-        // Save as MessagePack DAT file
-        var machines = ConvertXmlToMachines(mergedDoc);
-        SaveMachinesToDat(machines, datOutputPath);
-        Console.WriteLine($"Merged DAT file saved successfully to: {datOutputPath}");
-    }
-
-    // Helper method to merge documents from paths
-    private static XDocument? MergeDocumentsFromPaths(string[] inputFilePaths)
-    {
+        // Use a more reliable approach - process files one by one
         XDocument mergedDoc = new(new XElement("Machines"));
+        var filesProcessed = 0;
+        var totalFiles = inputFilePaths.Length;
+
+        // Define logging intervals
+        const int logInterval = 5; // Log every 5 files
 
         foreach (var inputFilePath in inputFilePaths)
         {
@@ -37,68 +35,106 @@ public static class MergeList
                 // Validate and normalize the document structure before merging
                 if (!IsValidAndNormalizeStructure(inputDoc, out var normalizedRoot))
                 {
-                    Console.WriteLine($"The file {inputFilePath} does not have the correct XML structure and will not be merged. Operation stopped.");
-                    return null; // Stop processing further files
+                    logWindow.AppendLog($"The file {Path.GetFileName(inputFilePath)} does not have the correct XML structure and will be skipped.");
+                    continue;
                 }
 
-                // Merge normalized content
-                if (normalizedRoot != null)
+                // Merge normalized content if we have any
+                if (normalizedRoot != null && mergedDoc.Root != null)
                 {
-                    mergedDoc = MergeDocuments(mergedDoc, normalizedRoot);
+                    mergedDoc.Root.Add(normalizedRoot.Elements());
+                }
+
+                filesProcessed++;
+
+                // Log at intervals
+                if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
+                {
+                    logWindow.AppendLog($"Processed {filesProcessed} of {totalFiles} files.");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred while loading the file {inputFilePath}: {ex.Message}");
-                _ = LogError.LogAsync(ex, $"An error occurred while loading the file {inputFilePath}: {ex.Message}");
-
-                return null; // Stop processing if there's an error loading a file
+                logWindow.AppendLog($"Error processing file {Path.GetFileName(inputFilePath)}: {ex.Message}");
+                _ = LogError.LogAsync(ex, $"Error processing file {inputFilePath}");
             }
         }
 
-        return mergedDoc;
+        // Check if we have any elements in the merged document
+        if (mergedDoc.Root == null || !mergedDoc.Root.Elements().Any())
+        {
+            logWindow.AppendLog("No valid data found in input files. Operation cancelled.");
+            return;
+        }
+
+        try
+        {
+            // Save as XML
+            logWindow.AppendLog("Saving merged XML file...");
+            mergedDoc.Save(xmlOutputPath);
+            logWindow.AppendLog($"Merged XML saved successfully to: {xmlOutputPath}");
+
+            // Save as MessagePack DAT file
+            logWindow.AppendLog("Converting to MessagePack format...");
+            var machines = ConvertXmlToMachines(mergedDoc);
+            SaveMachinesToDat(machines, datOutputPath, logWindow);
+            logWindow.AppendLog($"Merged DAT file saved successfully to: {datOutputPath}");
+        }
+        catch (Exception ex)
+        {
+            logWindow.AppendLog($"Error saving merged files: {ex.Message}");
+            _ = LogError.LogAsync(ex, "Error saving merged files");
+        }
     }
 
+    // Helper method to check if a document has valid structure
     private static bool IsValidAndNormalizeStructure(XDocument doc, out XElement? normalizedRoot)
     {
         normalizedRoot = null;
 
-        // Check for Machines format
-        if (doc.Root?.Name.LocalName == "Machines" && doc.Root.Elements("Machine").Any())
+        // Check root element exists
+        if (doc.Root == null)
         {
-            normalizedRoot = doc.Root;
-            return true;
+            return false;
         }
 
-        // Check for Softwares format
-        if (doc.Root?.Name.LocalName != "Softwares" || !doc.Root.Elements("Software").Any()) return false;
-
-        // Normalize Softwares to Machines format
-        normalizedRoot = new XElement("Machines",
-            doc.Root.Elements("Software").Select(static software =>
-                new XElement("Machine",
-                    new XElement("MachineName", software.Element("SoftwareName")?.Value),
-                    software.Element("Description")
-                )
-            )
-        );
-        return true;
-
-        // Invalid structure
-    }
-
-    private static XDocument MergeDocuments(XDocument doc1, XContainer normalizedRoot)
-    {
-        // Ensure that the first document has a non-null Root element before attempting to merge.
-        if (doc1.Root == null)
+        switch (doc.Root.Name.LocalName)
         {
-            throw new InvalidOperationException("The first document does not have a root element.");
+            // Check for Machines format
+            case "Machines" when doc.Root.Elements("Machine").Any():
+                normalizedRoot = doc.Root;
+                return true;
+            // Check for Softwares format
+            case "Softwares" when doc.Root.Elements("Software").Any():
+            {
+                // Normalize Softwares to Machines format
+                normalizedRoot = new XElement("Machines");
+
+                foreach (var software in doc.Root.Elements("Software"))
+                {
+                    var machineElement = new XElement("Machine");
+
+                    var softwareName = software.Element("SoftwareName")?.Value;
+                    if (!string.IsNullOrEmpty(softwareName))
+                    {
+                        machineElement.Add(new XElement("MachineName", softwareName));
+                    }
+
+                    var description = software.Element("Description");
+                    if (description != null)
+                    {
+                        machineElement.Add(new XElement("Description", description.Value));
+                    }
+
+                    normalizedRoot.Add(machineElement);
+                }
+
+                return normalizedRoot.Elements().Any();
+            }
+            default:
+                // Invalid structure
+                return false;
         }
-
-        // Add elements from normalizedRoot to the first document
-        doc1.Root.Add(normalizedRoot.Elements());
-
-        return doc1;
     }
 
     // Convert XML to a list of machines compatible with SimpleLauncher's MameConfig
@@ -106,7 +142,12 @@ public static class MergeList
     {
         var machines = new List<MachineInfo>();
 
-        foreach (var machineElement in doc.Root?.Elements("Machine") ?? [])
+        if (doc.Root == null)
+        {
+            return machines;
+        }
+
+        foreach (var machineElement in doc.Root.Elements("Machine"))
         {
             var machine = new MachineInfo
             {
@@ -120,7 +161,7 @@ public static class MergeList
     }
 
     // Save machines to MessagePack DAT file
-    private static void SaveMachinesToDat(List<MachineInfo> machines, string outputFilePath)
+    private static void SaveMachinesToDat(List<MachineInfo> machines, string outputFilePath, LogWindow logWindow)
     {
         try
         {
@@ -132,7 +173,8 @@ public static class MergeList
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving DAT file: {ex.Message}");
+            logWindow.AppendLog($"Error saving DAT file: {ex.Message}");
+            _ = LogError.LogAsync(ex, $"Error saving DAT file to {outputFilePath}");
         }
     }
 }

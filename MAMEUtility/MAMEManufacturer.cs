@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Concurrent;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -6,71 +7,108 @@ namespace MAMEUtility;
 
 public partial class MameManufacturer
 {
-    public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress)
+    public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress, LogWindow logWindow)
     {
-        Console.WriteLine($"Output folder for MAME Manufacturer: {outputFolderMameManufacturer}");
+        logWindow.AppendLog($"Output folder for MAME Manufacturer: {outputFolderMameManufacturer}");
 
         try
         {
-            // Extract unique manufacturers
+            // Extract unique manufacturers - ensure true uniqueness
             var manufacturers = inputDoc.Descendants("machine")
                 .Select(static m => (string?)m.Element("manufacturer"))
-                .Distinct()
-                .Where(static m => !string.IsNullOrEmpty(m));
+                .Where(static m => !string.IsNullOrEmpty(m))
+                .Distinct(StringComparer.OrdinalIgnoreCase) // Use case-insensitive comparison
+                .ToList();
 
-            var enumerable = manufacturers.ToList();
-            var totalManufacturers = enumerable.Count;
+            var totalManufacturers = manufacturers.Count;
             var manufacturersProcessed = 0;
 
-            // Iterate over each manufacturer and create an XML for each
-            foreach (var manufacturer in enumerable)
+            // Log less frequently - set interval
+            const int logInterval = 10; // Log every 10 manufacturers
+            const int progressInterval = 5; // Update progress every 5 manufacturers
+
+            logWindow.AppendLog($"Found {totalManufacturers} unique manufacturers to process.");
+
+            // Use a dictionary to track processed manufacturer names and their safe filenames
+            var processedManufacturers = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            // Use a dictionary approach instead of parallel processing to avoid file conflicts
+            foreach (var manufacturer in manufacturers)
             {
                 if (manufacturer == null) continue;
 
-                var safeManufacturerName = RemoveExtraWhitespace(manufacturer
-                        .Replace("<", "")
-                        .Replace(">", "")
-                        .Replace(":", "")
-                        .Replace("\"", "")
-                        .Replace("/", "")
-                        .Replace("\\", "")
-                        .Replace("|", "")
-                        .Replace("?", "")
-                        .Replace("*", "")
-                        .Replace("unknown", "UnknownManufacturer")
-                        .Trim())
-                    .Replace("&amp;", "&"); // Replace &amp; with & in the filename.
+                try
+                {
+                    var safeManufacturerName = RemoveExtraWhitespace(manufacturer
+                            .Replace("<", "")
+                            .Replace(">", "")
+                            .Replace(":", "")
+                            .Replace("\"", "")
+                            .Replace("/", "")
+                            .Replace("\\", "")
+                            .Replace("|", "")
+                            .Replace("?", "")
+                            .Replace("*", "")
+                            .Replace("unknown", "UnknownManufacturer")
+                            .Trim())
+                        .Replace("&amp;", "&");
 
-                var outputFilePath = Path.Combine(outputFolderMameManufacturer, $"{safeManufacturerName}.xml");
-                Console.WriteLine($"Attempting to create file for: {safeManufacturerName}.xml");
+                    // Check if this manufacturer name has already been processed
+                    // If so, append a number to make it unique
+                    var uniqueSafeName = safeManufacturerName;
+                    var counter = 1;
+                    while (!processedManufacturers.TryAdd(manufacturer, uniqueSafeName))
+                    {
+                        uniqueSafeName = $"{safeManufacturerName}_{counter++}";
+                    }
 
-                await CreateAndSaveFilteredDocumentAsync(inputDoc, outputFilePath, manufacturer, safeManufacturerName);
+                    var outputFilePath = Path.Combine(outputFolderMameManufacturer, $"{uniqueSafeName}.xml");
 
-                manufacturersProcessed++;
-                var progressPercentage = (double)manufacturersProcessed / totalManufacturers * 100;
-                progress.Report((int)progressPercentage);
+                    // Create filtered document for this manufacturer
+                    var filteredDoc = CreateFilteredDocument(inputDoc, manufacturer);
+
+                    // Save to file with exclusive access
+                    await using (var fileStream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        await Task.Run(() => filteredDoc.Save(fileStream));
+                    }
+
+                    // Thread-safe incrementing
+                    var processed = Interlocked.Increment(ref manufacturersProcessed);
+
+                    // Log only at intervals
+                    if (processed % logInterval == 0 || processed == totalManufacturers)
+                    {
+                        logWindow.AppendLog($"Progress: {processed}/{totalManufacturers} manufacturers processed.");
+                    }
+
+                    // Update progress less frequently
+                    if (processed % progressInterval == 0 || processed == totalManufacturers)
+                    {
+                        var progressPercentage = (double)processed / totalManufacturers * 100;
+                        progress.Report((int)progressPercentage);
+                    }
+                }
+                catch (IOException ex)
+                {
+                    // Log the file access error but continue processing other manufacturers
+                    logWindow.AppendLog($"File access error processing manufacturer '{manufacturer}': {ex.Message}");
+                    await LogError.LogAsync(ex, $"File access error processing manufacturer '{manufacturer}'");
+                }
+                catch (Exception ex)
+                {
+                    // Log other errors but continue processing
+                    logWindow.AppendLog($"Error processing manufacturer '{manufacturer}': {ex.Message}");
+                    await LogError.LogAsync(ex, $"Error processing manufacturer '{manufacturer}'");
+                }
             }
+
+            logWindow.AppendLog("All manufacturer files created successfully.");
         }
         catch (Exception ex)
         {
-            Console.WriteLine("An error occurred: " + ex.Message);
+            logWindow.AppendLog("An error occurred: " + ex.Message);
             await LogError.LogAsync(ex, "Error in method MAMEManufacturer.CreateAndSaveMameManufacturerAsync");
-        }
-    }
-
-    private static async Task CreateAndSaveFilteredDocumentAsync(XContainer inputDoc, string outputPath, string manufacturer, string safeManufacturerName)
-    {
-        var filteredDoc = CreateFilteredDocument(inputDoc, manufacturer);
-
-        try
-        {
-            await Task.Run(() => filteredDoc.Save(outputPath));
-            Console.WriteLine($"Successfully created: {outputPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to create file for {safeManufacturerName}. Error: {ex.Message}");
-            await LogError.LogAsync(ex, "Error in method MAMEManufacturer.CreateAndSaveFilteredDocumentAsync");
         }
     }
 

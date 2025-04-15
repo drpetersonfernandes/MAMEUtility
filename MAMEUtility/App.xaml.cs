@@ -12,9 +12,16 @@ public partial class App : IDisposable
     private BugReportService? _bugReportService;
     private LogError? _logError;
 
+    // Static property to access the LogWindow from anywhere
+    public static LogWindow? SharedLogWindow { get; set; }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Create the shared LogWindow
+        SharedLogWindow = new LogWindow();
+        SharedLogWindow.Show();
 
         // Initialize bug report service using configuration
         var config = AppConfig.Instance;
@@ -60,7 +67,7 @@ public partial class App : IDisposable
         try
         {
             // Log exception to console for debugging purposes
-            Console.WriteLine($"Error: {exception.Message}");
+            SharedLogWindow?.AppendLog($"Error: {exception.Message}");
 
             // Use our LogError class to handle the exception
             if (_logError != null)
@@ -87,6 +94,8 @@ public partial class App : IDisposable
             _bugReportService.Dispose();
             _bugReportService = null;
         }
+
+        // Don't close the LogWindow here as MainWindow might still be using it
 
         // Suppress finalization
         GC.SuppressFinalize(this);

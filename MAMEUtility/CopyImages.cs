@@ -5,10 +5,14 @@ namespace MAMEUtility;
 
 public static class CopyImages
 {
-    public static async Task CopyImagesFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
+    public static async Task CopyImagesFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress, LogWindow logWindow)
     {
         var totalFiles = xmlFilePaths.Length;
         var filesCopied = 0;
+
+        // Define logging intervals
+        const int logInterval = 5; // Log progress every 5 files
+        const int progressInterval = 2; // Update progress every 2 files
 
         await LogError.LogMessageAsync($"Starting image copy operation. Files to process: {totalFiles}");
         await LogError.LogMessageAsync($"Source directory: {sourceDirectory}");
@@ -36,34 +40,46 @@ public static class CopyImages
             }
         }
 
+        // Process each XML file - sequential to avoid overwhelming file system
         foreach (var xmlFilePath in xmlFilePaths)
         {
             try
             {
-                await LogError.LogMessageAsync($"Processing XML file: {Path.GetFileName(xmlFilePath)}");
-                await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress);
+                await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress, logWindow);
+
                 filesCopied++;
+
+                // Log progress at intervals
+                if (filesCopied % logInterval == 0 || filesCopied == totalFiles)
+                {
+                    await LogError.LogMessageAsync($"Progress: {filesCopied}/{totalFiles} XML files processed.");
+                }
+
+                // Update progress bar at intervals
+                if (filesCopied % progressInterval != 0 && filesCopied != totalFiles) continue;
+
                 var progressPercentage = (double)filesCopied / totalFiles * 100;
                 progress.Report((int)progressPercentage);
-                await LogError.LogMessageAsync($"Successfully processed XML file: {Path.GetFileName(xmlFilePath)}");
             }
             catch (Exception ex)
             {
                 await LogError.LogAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
-                Console.WriteLine($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
+                logWindow.AppendLog($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
             }
         }
 
         await LogError.LogMessageAsync($"Image copy operation completed. Processed {filesCopied} of {totalFiles} files.");
     }
 
-    private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
+    // Fix for the ProcessXmlFileAsync method in CopyImages.cs
+    // Fix for the ProcessXmlFileAsync method in CopyImages.cs
+    private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress, LogWindow logWindow)
     {
         XDocument xmlDoc;
 
         try
         {
-            xmlDoc = XDocument.Load(xmlFilePath);
+            xmlDoc = await Task.Run(() => XDocument.Load(xmlFilePath));
             await LogError.LogMessageAsync($"Successfully loaded XML file: {Path.GetFileName(xmlFilePath)}");
         }
         catch (Exception ex)
@@ -77,8 +93,8 @@ public static class CopyImages
         {
             var message = $"The file {Path.GetFileName(xmlFilePath)} does not match the required XML structure. Operation cancelled.";
             await LogError.LogMessageAsync(message, LogLevel.Warning);
-            Console.WriteLine(message);
-            return; // Stop processing this XML file
+            logWindow.AppendLog(message);
+            return;
         }
 
         var machineNames = xmlDoc.Descendants("Machine")
@@ -89,30 +105,81 @@ public static class CopyImages
         var totalImages = machineNames.Count;
         var imagesCopied = 0;
 
+        // Define logging intervals for internal processing
+        const int internalLogInterval = 100; // Log every 100 images
+        const int internalProgressInterval = 50; // Update progress every 50 images
+
         await LogError.LogMessageAsync($"Found {totalImages} machine entries in {Path.GetFileName(xmlFilePath)}");
 
-        foreach (var machineName in machineNames)
-        {
-            // Here, 'machineName' is enforced to be non-null by the previous checks, so the null-forgiving operator '!' is used.
-            await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "png");
-            await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpg");
-            await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpeg");
+        // Process images with controlled parallelism
+        var maxConcurrency = Math.Max(1, Environment.ProcessorCount);
+        var activeTasks = new List<Task>();
+        var processingQueue = new Queue<string>(machineNames!);
 
-            imagesCopied++;
-            var progressPercentage = (double)imagesCopied / totalImages * 100;
-            progress.Report((int)progressPercentage);
+        // Start initial batch of tasks
+        while (activeTasks.Count < maxConcurrency && processingQueue.Count > 0)
+        {
+            var machine = processingQueue.Dequeue();
+            activeTasks.Add(ProcessMachineAsync(machine));
+        }
+
+        // Process remaining machines as tasks complete
+        while (activeTasks.Count > 0)
+        {
+            var completedTask = await Task.WhenAny(activeTasks);
+            activeTasks.Remove(completedTask);
+
+            // Add a new task if there are items remaining
+            if (processingQueue.Count <= 0) continue;
+
+            var machine = processingQueue.Dequeue();
+            activeTasks.Add(ProcessMachineAsync(machine));
         }
 
         await LogError.LogMessageAsync($"Completed processing {imagesCopied} machines from {Path.GetFileName(xmlFilePath)}");
+        return;
+
+        // Helper function to process a machine
+        async Task ProcessMachineAsync(string machineName)
+        {
+            try
+            {
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "png", logWindow);
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpg", logWindow);
+                await CopyImageFileAsync(sourceDirectory, destinationDirectory, machineName, "jpeg", logWindow);
+
+                // Thread-safe incrementing and reporting
+                var processed = Interlocked.Increment(ref imagesCopied);
+
+                // Update progress at intervals
+                if (processed % internalProgressInterval == 0 || processed == totalImages)
+                {
+                    var progressPercentage = (double)processed / totalImages * 100;
+                    progress.Report((int)progressPercentage);
+                }
+
+                // Log at intervals
+                if (processed % internalLogInterval == 0 || processed == totalImages)
+                {
+                    await LogError.LogMessageAsync($"Image copy progress: {processed}/{totalImages} from {Path.GetFileName(xmlFilePath)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log any errors but continue processing
+                await LogError.LogAsync(ex, $"Error processing {machineName}");
+                logWindow.AppendLog($"Error processing {machineName}: {ex.Message}");
+            }
+        }
     }
 
 
-    private static async Task CopyImageFileAsync(string sourceDirectory, string destinationDirectory, string? machineName, string extension)
+    private static async Task CopyImageFileAsync(string sourceDirectory, string destinationDirectory, string? machineName, string extension, LogWindow logWindow)
     {
         if (machineName == null)
         {
             await LogError.LogMessageAsync($"Machine name is null for extension: {extension}", LogLevel.Warning);
-            Console.WriteLine($"Machine name is null for extension: {extension}");
+            logWindow.AppendLog($"Machine name is null for extension: {extension}");
             return;
         }
 
@@ -126,18 +193,18 @@ public static class CopyImages
                 try
                 {
                     File.Copy(sourceFile, destinationFile, true);
-                    Console.WriteLine($"Copied: {machineName}.{extension} to {destinationDirectory}");
+                    logWindow.AppendLog($"Copied: {machineName}.{extension} to {destinationDirectory}");
                 }
                 catch (Exception ex)
                 {
                     await LogError.LogAsync(ex, $"Failed to copy {machineName}.{extension}");
-                    Console.WriteLine($"Failed to copy {machineName}.{extension}: {ex.Message}");
+                    logWindow.AppendLog($"Failed to copy {machineName}.{extension}: {ex.Message}");
                 }
             }
             else
             {
                 // This is just informational, doesn't need to be logged as a warning
-                Console.WriteLine($"File not found: {machineName}.{extension}");
+                logWindow.AppendLog($"File not found: {machineName}.{extension}");
             }
         });
     }
