@@ -22,6 +22,7 @@ public static class CopyRoms
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
+                await LogError.LogAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
             }
         }
     }
@@ -34,12 +35,14 @@ public static class CopyRoms
         if (!ValidateXmlStructure(xmlDoc))
         {
             Console.WriteLine($"The file {Path.GetFileName(xmlFilePath)} does not match the required XML structure. Operation cancelled.");
+            await LogError.LogMessageAsync($"The file {Path.GetFileName(xmlFilePath)} does not match the required XML structure. Operation cancelled.", LogLevel.Warning);
+
             return; // Stop processing this XML file
         }
 
         var machineNames = xmlDoc.Descendants("Machine")
-            .Select(machine => machine.Element("MachineName")?.Value)
-            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(static machine => machine.Element("MachineName")?.Value)
+            .Where(static name => !string.IsNullOrEmpty(name))
             .ToList();
 
         var totalRoms = machineNames.Count;
@@ -57,7 +60,7 @@ public static class CopyRoms
 
     private static Task CopyRomAsync(string sourceDirectory, string destinationDirectory, string? machineName)
     {
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             Console.WriteLine($"Attempting to copy ROM for machine: {machineName}");
             try
@@ -70,7 +73,7 @@ public static class CopyRoms
 
                 if (File.Exists(sourceFile))
                 {
-                    File.Copy(sourceFile, destinationFile, overwrite: true);
+                    File.Copy(sourceFile, destinationFile, true);
                     Console.WriteLine($"Successfully copied: {machineName}.zip to {destinationDirectory}");
                 }
                 else
@@ -81,6 +84,7 @@ public static class CopyRoms
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred copying ROM for {machineName}: {ex.Message}");
+                await LogError.LogAsync(ex, $"An error occurred copying ROM for {machineName}");
             }
         });
     }
@@ -90,7 +94,7 @@ public static class CopyRoms
         // Check if the root element is "Machines" and if it contains at least one "Machine" element
         // with both "MachineName" and "Description" child elements.
         var isValid = xmlDoc.Root?.Name.LocalName == "Machines" &&
-                      xmlDoc.Descendants("Machine").Any(machine =>
+                      xmlDoc.Descendants("Machine").Any(static machine =>
                           machine.Element("MachineName") != null &&
                           machine.Element("Description") != null);
 

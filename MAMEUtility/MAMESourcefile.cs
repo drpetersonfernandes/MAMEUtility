@@ -13,9 +13,9 @@ public static class MameSourcefile
         {
             // Extract unique source files
             var sourceFiles = inputDoc.Descendants("machine")
-                .Select(m => (string?)m.Attribute("sourcefile"))
+                .Select(static m => (string?)m.Attribute("sourcefile"))
                 .Distinct()
-                .Where(s => !string.IsNullOrEmpty(s));
+                .Where(static s => !string.IsNullOrEmpty(s));
 
             var enumerable = sourceFiles.ToList();
             var totalSourceFiles = enumerable.Count;
@@ -51,15 +51,12 @@ public static class MameSourcefile
         catch (Exception ex)
         {
             Console.WriteLine("An error occurred: " + ex.Message);
+            await LogError.LogAsync(ex, "Error in method MAMESourcefile.CreateAndSaveMameSourcefileAsync");
         }
     }
 
-    private static async Task CreateAndSaveFilteredDocumentAsync(XDocument inputDoc, string outputPath, string sourceFile)
+    private static async Task CreateAndSaveFilteredDocumentAsync(XContainer inputDoc, string outputPath, string sourceFile)
     {
-        // Filtering condition based on the source file
-        bool Predicate(XElement machine) =>
-            (string?)machine.Attribute("sourcefile") == sourceFile;
-
         // Create a new XML document for machines based on the predicate
         XDocument filteredDoc = new(
             new XElement("Machines",
@@ -81,6 +78,15 @@ public static class MameSourcefile
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to create file for {sourceFile}. Error: {ex.Message}");
+            await LogError.LogAsync(ex, "Error in method MAMESourcefile.CreateAndSaveFilteredDocumentAsync");
+        }
+
+        return;
+
+        // Filtering condition based on the source file
+        bool Predicate(XElement machine)
+        {
+            return (string?)machine.Attribute("sourcefile") == sourceFile;
         }
     }
 
