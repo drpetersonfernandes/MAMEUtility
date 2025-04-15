@@ -1,13 +1,14 @@
 ﻿using System.IO;
 using System.Xml.Linq;
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameSourcefile
 {
-    public static async Task CreateAndSaveMameSourcefileAsync(XDocument inputDoc, string outputFolderMameSourcefile, IProgress<int> progress, LogWindow logWindow)
+    public static async Task CreateAndSaveMameSourcefileAsync(XDocument inputDoc, string outputFolderMameSourcefile, IProgress<int> progress, ILogService logService)
     {
-        logWindow.AppendLog($"Output folder for MAME Sourcefile: {outputFolderMameSourcefile}");
+        logService.Log($"Output folder for MAME Sourcefile: {outputFolderMameSourcefile}");
 
         try
         {
@@ -25,7 +26,7 @@ public static class MameSourcefile
             const int logInterval = 10; // Log every 10 sourcefiles
             const int progressInterval = 5; // Update progress every 5 sourcefiles
 
-            logWindow.AppendLog($"Found {totalSourceFiles} unique source files to process.");
+            logService.Log($"Found {totalSourceFiles} unique source files to process.");
 
             // Use parallel processing with throttling
             var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) };
@@ -51,7 +52,18 @@ public static class MameSourcefile
                 );
 
                 // Save document
-                await Task.Run(() => filteredDoc.Save(outputFilePath), token);
+                try
+                {
+                    await Task.Run(() => filteredDoc.Save(outputFilePath), token);
+                }
+                catch (Exception ex)
+                {
+                    logService.LogError($"Failed to create file for {sourceFile}. Error: {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"Error saving sourcefile document for {sourceFile}");
+
+                    return;
+                }
+
 
                 // Thread-safe incrementing
                 var processed = Interlocked.Increment(ref sourceFilesProcessed);
@@ -59,10 +71,10 @@ public static class MameSourcefile
                 // Log only at intervals
                 if (processed % logInterval == 0 || processed == totalSourceFiles)
                 {
-                    logWindow.AppendLog($"Progress: {processed}/{totalSourceFiles} source files processed.");
+                    logService.Log($"Progress: {processed}/{totalSourceFiles} source files processed.");
                 }
 
-                // Update progress less frequently
+                // Update progress
                 if (processed % progressInterval == 0 || processed == totalSourceFiles)
                 {
                     var progressPercentage = (double)processed / totalSourceFiles * 100;
@@ -70,47 +82,12 @@ public static class MameSourcefile
                 }
             });
 
-            logWindow.AppendLog("All source file documents created successfully.");
+            logService.Log("All source file documents created successfully.");
         }
         catch (Exception ex)
         {
-            logWindow.AppendLog("An error occurred: " + ex.Message);
-            await LogError.LogAsync(ex, "Error in method MAMESourcefile.CreateAndSaveMameSourcefileAsync");
-        }
-    }
-
-    private static async Task CreateAndSaveFilteredDocumentAsync(XContainer inputDoc, string outputPath, string sourceFile, LogWindow logWindow)
-    {
-        // Create a new XML document for machines based on the predicate
-        XDocument filteredDoc = new(
-            new XElement("Machines",
-                from machine in inputDoc.Descendants("machine")
-                where Predicate(machine)
-                select new XElement("Machine",
-                    new XElement("MachineName", machine.Attribute("name")?.Value),
-                    new XElement("Description", machine.Element("description")?.Value)
-                )
-            )
-        );
-
-        // Save the filtered XML document
-        try
-        {
-            await Task.Run(() => filteredDoc.Save(outputPath));
-            logWindow.AppendLog($"Successfully created: {outputPath}");
-        }
-        catch (Exception ex)
-        {
-            logWindow.AppendLog($"Failed to create file for {sourceFile}. Error: {ex.Message}");
-            await LogError.LogAsync(ex, "Error in method MAMESourcefile.CreateAndSaveFilteredDocumentAsync");
-        }
-
-        return;
-
-        // Filtering condition based on the source file
-        bool Predicate(XElement machine)
-        {
-            return (string?)machine.Attribute("sourcefile") == sourceFile;
+            logService.LogError("An error occurred: " + ex.Message);
+            await logService.LogExceptionAsync(ex, "Error in method MAMESourcefile.CreateAndSaveMameSourcefileAsync");
         }
     }
 

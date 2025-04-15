@@ -1,24 +1,23 @@
 ﻿using System.IO;
 using System.Xml.Linq;
-using MAMEUtility;
+using MAMEUtility.Services.Interfaces; // Added
 using MessagePack;
 
-namespace MameUtility;
+namespace MAMEUtility;
 
 public static class MergeList
 {
-    // Save as both XML and DAT files
-    public static void MergeAndSaveBoth(string[] inputFilePaths, string xmlOutputPath, string datOutputPath, LogWindow logWindow)
+    public static async Task MergeAndSaveBothAsync(string[] inputFilePaths, string xmlOutputPath, string datOutputPath, ILogService logService)
     {
         if (inputFilePaths.Length == 0)
         {
-            logWindow.AppendLog("No input files provided. Operation cancelled.");
+            logService.LogWarning("No input files provided. Operation cancelled.");
+
             return;
         }
 
-        logWindow.AppendLog($"Starting merge operation with {inputFilePaths.Length} files.");
+        logService.Log($"Starting merge operation with {inputFilePaths.Length} files.");
 
-        // Use a more reliable approach - process files one by one
         XDocument mergedDoc = new(new XElement("Machines"));
         var filesProcessed = 0;
         var totalFiles = inputFilePaths.Length;
@@ -30,12 +29,14 @@ public static class MergeList
         {
             try
             {
-                var inputDoc = XDocument.Load(inputFilePath);
+                // Load asynchronously
+                var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath));
 
                 // Validate and normalize the document structure before merging
                 if (!IsValidAndNormalizeStructure(inputDoc, out var normalizedRoot))
                 {
-                    logWindow.AppendLog($"The file {Path.GetFileName(inputFilePath)} does not have the correct XML structure and will be skipped.");
+                    // Replaced logWindow.AppendLog with logService.LogWarning
+                    logService.LogWarning($"The file {Path.GetFileName(inputFilePath)} does not have the correct XML structure and will be skipped.");
                     continue;
                 }
 
@@ -50,44 +51,47 @@ public static class MergeList
                 // Log at intervals
                 if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
                 {
-                    logWindow.AppendLog($"Processed {filesProcessed} of {totalFiles} files.");
+                    // Replaced logWindow.AppendLog with logService.Log
+                    logService.Log($"Processed {filesProcessed} of {totalFiles} files.");
                 }
             }
             catch (Exception ex)
             {
-                logWindow.AppendLog($"Error processing file {Path.GetFileName(inputFilePath)}: {ex.Message}");
-                _ = LogError.LogAsync(ex, $"Error processing file {inputFilePath}");
+                logService.LogError($"Error processing file {Path.GetFileName(inputFilePath)}: {ex.Message}");
+                await logService.LogExceptionAsync(ex, $"Error processing file {inputFilePath}");
             }
         }
 
         // Check if we have any elements in the merged document
         if (mergedDoc.Root == null || !mergedDoc.Root.Elements().Any())
         {
-            logWindow.AppendLog("No valid data found in input files. Operation cancelled.");
+            // Replaced logWindow.AppendLog with logService.LogWarning
+            logService.LogWarning("No valid data found in input files. Operation cancelled.");
             return;
         }
 
         try
         {
             // Save as XML
-            logWindow.AppendLog("Saving merged XML file...");
-            mergedDoc.Save(xmlOutputPath);
-            logWindow.AppendLog($"Merged XML saved successfully to: {xmlOutputPath}");
+            logService.Log("Saving merged XML file...");
+            await Task.Run(() => mergedDoc.Save(xmlOutputPath));
+            logService.Log($"Merged XML saved successfully to: {xmlOutputPath}");
 
             // Save as MessagePack DAT file
-            logWindow.AppendLog("Converting to MessagePack format...");
+            logService.Log("Converting to MessagePack format...");
             var machines = ConvertXmlToMachines(mergedDoc);
-            SaveMachinesToDat(machines, datOutputPath, logWindow);
-            logWindow.AppendLog($"Merged DAT file saved successfully to: {datOutputPath}");
+            await SaveMachinesToDatAsync(machines, datOutputPath, logService); // Save async
+            logService.Log($"Merged DAT file saved successfully to: {datOutputPath}");
         }
         catch (Exception ex)
         {
-            logWindow.AppendLog($"Error saving merged files: {ex.Message}");
-            _ = LogError.LogAsync(ex, "Error saving merged files");
+            logService.LogError($"Error saving merged files: {ex.Message}");
+            await logService.LogExceptionAsync(ex, "Error saving merged files");
+
+            throw;
         }
     }
 
-    // Helper method to check if a document has valid structure
     private static bool IsValidAndNormalizeStructure(XDocument doc, out XElement? normalizedRoot)
     {
         normalizedRoot = null;
@@ -161,25 +165,26 @@ public static class MergeList
     }
 
     // Save machines to MessagePack DAT file
-    private static void SaveMachinesToDat(List<MachineInfo> machines, string outputFilePath, LogWindow logWindow)
+    private static async Task SaveMachinesToDatAsync(List<MachineInfo> machines, string outputFilePath, ILogService logService)
     {
         try
         {
             // Serialize the machines' list to a MessagePack binary array
-            var binary = MessagePackSerializer.Serialize(machines);
+            var binary = await Task.Run(() => MessagePackSerializer.Serialize(machines)); // Serialize async
 
-            // Write the binary data to the output file
-            File.WriteAllBytes(outputFilePath, binary);
+            // Write the binary data to the output file async
+            await File.WriteAllBytesAsync(outputFilePath, binary);
         }
         catch (Exception ex)
         {
-            logWindow.AppendLog($"Error saving DAT file: {ex.Message}");
-            _ = LogError.LogAsync(ex, $"Error saving DAT file to {outputFilePath}");
+            logService.LogError($"Error saving DAT file: {ex.Message}");
+            await logService.LogExceptionAsync(ex, $"Error saving DAT file to {outputFilePath}");
+
+            throw;
         }
     }
 }
 
-// This class matches the structure in SimpleLauncher.MameConfig
 [MessagePackObject]
 public class MachineInfo
 {

@@ -1,13 +1,14 @@
 ﻿using System.ComponentModel;
 using System.Xml.Linq;
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameFull
 {
-    public static Task CreateAndSaveMameFullAsync(XDocument inputDoc, string outputFilePathMameFull, BackgroundWorker worker, LogWindow logWindow)
+    public static Task CreateAndSaveMameFullAsync(XDocument inputDoc, string outputFilePathMameFull, BackgroundWorker worker, ILogService logService)
     {
-        logWindow.AppendLog($"Output file for MAME Full: {outputFilePathMameFull}");
+        logService.Log($"Output file for MAME Full: {outputFilePathMameFull}");
 
         return Task.Run(() =>
         {
@@ -16,8 +17,8 @@ public static class MameFull
             var totalMachines = machineElements.Count;
             var machinesProcessed = 0;
 
-            logWindow.AppendLog($"Total machines: {totalMachines}");
-            logWindow.AppendLog("Processing machines...");
+            logService.Log($"Total machines: {totalMachines}");
+            logService.Log("Processing machines...");
 
             // Log progress at regular intervals instead of for every machine
             const int logInterval = 500; // Log every 500 machines
@@ -46,20 +47,20 @@ public static class MameFull
                 // Log only occasionally to avoid UI bottlenecks
                 if (machinesProcessed % logInterval == 0 || machinesProcessed == totalMachines)
                 {
-                    logWindow.AppendLog($"Progress: {machinesProcessed}/{totalMachines} machines processed");
+                    logService.Log($"Progress: {machinesProcessed}/{totalMachines} machines processed");
                 }
 
-                // Update progress bar less frequently
+                // Update progress bar
                 if (machinesProcessed % progressInterval != 0 && machinesProcessed != totalMachines) continue;
 
                 var progressPercentage = (int)((double)machinesProcessed / totalMachines * 100);
                 worker.ReportProgress(progressPercentage);
             }
 
-            logWindow.AppendLog("Saving to file...");
+            logService.Log("Saving to file...");
             allMachineDetailsDoc.Save(outputFilePathMameFull);
             worker.ReportProgress(100);
-            logWindow.AppendLog("MAME Full XML file created successfully.");
+            logService.Log("MAME Full XML file created successfully.");
         });
     }
 }

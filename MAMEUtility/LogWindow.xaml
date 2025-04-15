@@ -6,9 +6,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewModels="clr-namespace:MAMEUtility.ViewModels"
     Title="MAME Utility Log" 
-    Height="500" 
-    Width="800"
-    Icon="/images/logo.png"
+    Height="450" 
+    Width="600"
     d:DataContext="{d:DesignInstance Type=viewModels:LogViewModel}"
     mc:Ignorable="d">
     
@@ -41,7 +40,6 @@
                     Command="{Binding ClearCommand}" 
                     Style="{StaticResource DefaultButtonStyle}" />
                 
-                <!-- We could add more buttons here like "Save Log" or "Filter" in the future -->
             </StackPanel>
         </Grid>
         

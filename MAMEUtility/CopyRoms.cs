@@ -1,11 +1,12 @@
 ﻿using System.IO;
 using System.Xml.Linq;
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
 public static class CopyRoms
 {
-    public static async Task CopyRomsFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress, LogWindow logWindow)
+    public static async Task CopyRomsFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress, ILogService logService)
     {
         var totalFiles = xmlFilePaths.Length;
         var filesProcessed = 0;
@@ -14,14 +15,14 @@ public static class CopyRoms
         const int logInterval = 5; // Log progress every 5 files
         const int progressInterval = 2; // Update progress every 2 files
 
-        logWindow.AppendLog($"Starting ROM copy operation. Files to process: {totalFiles}");
-        logWindow.AppendLog($"Source directory: {sourceDirectory}");
-        logWindow.AppendLog($"Destination directory: {destinationDirectory}");
+        logService.Log($"Starting ROM copy operation. Files to process: {totalFiles}");
+        logService.Log($"Source directory: {sourceDirectory}");
+        logService.Log($"Destination directory: {destinationDirectory}");
 
         // Validate directories first
         if (!Directory.Exists(sourceDirectory))
         {
-            logWindow.AppendLog($"Source directory does not exist: {sourceDirectory}");
+            logService.LogError($"Source directory does not exist: {sourceDirectory}");
             throw new DirectoryNotFoundException($"Source directory does not exist: {sourceDirectory}");
         }
 
@@ -31,11 +32,11 @@ public static class CopyRoms
             try
             {
                 Directory.CreateDirectory(destinationDirectory);
-                logWindow.AppendLog($"Created destination directory: {destinationDirectory}");
+                logService.Log($"Created destination directory: {destinationDirectory}");
             }
             catch (Exception ex)
             {
-                await LogError.LogAsync(ex, $"Failed to create destination directory: {destinationDirectory}");
+                await logService.LogExceptionAsync(ex, $"Failed to create destination directory: {destinationDirectory}");
                 throw;
             }
         }
@@ -45,14 +46,15 @@ public static class CopyRoms
         {
             try
             {
-                await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress, logWindow);
+                // Pass logService down
+                await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, progress, logService);
 
                 filesProcessed++;
 
                 // Log progress at intervals
                 if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
                 {
-                    logWindow.AppendLog($"Progress: {filesProcessed}/{totalFiles} XML files processed.");
+                    logService.Log($"Progress: {filesProcessed}/{totalFiles} XML files processed.");
                 }
 
                 // Update progress bar at intervals
@@ -63,15 +65,15 @@ public static class CopyRoms
             }
             catch (Exception ex)
             {
-                logWindow.AppendLog($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
-                await LogError.LogAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
+                logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
+                await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
             }
         }
 
-        logWindow.AppendLog($"ROM copy operation completed. Processed {filesProcessed} of {totalFiles} files.");
+        logService.Log($"ROM copy operation completed. Processed {filesProcessed} of {totalFiles} files.");
     }
 
-    private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress, LogWindow logWindow)
+    private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress, ILogService logService)
     {
         XDocument xmlDoc;
 
@@ -81,7 +83,7 @@ public static class CopyRoms
         }
         catch (Exception ex)
         {
-            await LogError.LogAsync(ex, $"Failed to load XML file: {xmlFilePath}");
+            await logService.LogExceptionAsync(ex, $"Failed to load XML file: {xmlFilePath}");
             throw;
         }
 
@@ -89,7 +91,8 @@ public static class CopyRoms
         if (!ValidateXmlStructure(xmlDoc))
         {
             var message = $"The file {Path.GetFileName(xmlFilePath)} does not match the required XML structure. Operation cancelled.";
-            logWindow.AppendLog(message);
+            logService.LogWarning(message);
+
             return;
         }
 
@@ -105,7 +108,7 @@ public static class CopyRoms
         const int internalLogInterval = 100; // Log every 100 ROMs
         const int internalProgressInterval = 50; // Update progress every 50 ROMs
 
-        logWindow.AppendLog($"Found {totalRoms} machine entries in {Path.GetFileName(xmlFilePath)}");
+        logService.Log($"Found {totalRoms} machine entries in {Path.GetFileName(xmlFilePath)}");
 
         // Use parallel processing with throttling for ROM copying
         var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) };
@@ -113,7 +116,8 @@ public static class CopyRoms
 
         await Parallel.ForEachAsync(machineNames, options, async (machineName, token) =>
         {
-            await CopyRomAsync(sourceDirectory, destinationDirectory, machineName, logWindow);
+            // Pass logService down
+            await CopyRomAsync(sourceDirectory, destinationDirectory, machineName, logService);
 
             // Thread-safe incrementing
             lock (sync)
@@ -131,41 +135,43 @@ public static class CopyRoms
                 // Log at intervals - inside lock to avoid log interleaving
                 if (processed % internalLogInterval == 0 || processed == totalRoms)
                 {
-                    logWindow.AppendLog($"ROM copy progress: {processed}/{totalRoms} from {Path.GetFileName(xmlFilePath)}");
+                    logService.Log($"ROM copy progress: {processed}/{totalRoms} from {Path.GetFileName(xmlFilePath)}");
                 }
             }
         });
 
-        logWindow.AppendLog($"Completed processing {romsProcessed} ROMs from {Path.GetFileName(xmlFilePath)}");
+        logService.Log($"Completed processing {romsProcessed} ROMs from {Path.GetFileName(xmlFilePath)}");
     }
 
-    private static Task CopyRomAsync(string sourceDirectory, string destinationDirectory, string? machineName, LogWindow logWindow)
+    // Changed LogWindow logWindow to ILogService logService
+    private static Task CopyRomAsync(string sourceDirectory, string destinationDirectory, string? machineName, ILogService logService)
     {
         return Task.Run(async () =>
         {
-            logWindow.AppendLog($"Attempting to copy ROM for machine: {machineName}");
+            // Replaced logWindow.AppendLog with logService.Log
+            logService.Log($"Attempting to copy ROM for machine: {machineName}");
             try
             {
                 var sourceFile = Path.Combine(sourceDirectory, machineName + ".zip");
                 var destinationFile = Path.Combine(destinationDirectory, machineName + ".zip");
 
-                logWindow.AppendLog($"Source file path: {sourceFile}");
-                logWindow.AppendLog($"Destination file path: {destinationFile}");
+                logService.Log($"Source file path: {sourceFile}");
+                logService.Log($"Destination file path: {destinationFile}");
 
                 if (File.Exists(sourceFile))
                 {
                     File.Copy(sourceFile, destinationFile, true);
-                    logWindow.AppendLog($"Successfully copied: {machineName}.zip to {destinationDirectory}");
+                    logService.Log($"Successfully copied: {machineName}.zip to {destinationDirectory}");
                 }
                 else
                 {
-                    logWindow.AppendLog($"File not found: {sourceFile}");
+                    logService.Log($"File not found: {sourceFile}");
                 }
             }
             catch (Exception ex)
             {
-                logWindow.AppendLog($"An error occurred copying ROM for {machineName}: {ex.Message}");
-                await LogError.LogAsync(ex, $"An error occurred copying ROM for {machineName}");
+                logService.LogError($"An error occurred copying ROM for {machineName}: {ex.Message}");
+                await logService.LogExceptionAsync(ex, $"An error occurred copying ROM for {machineName}");
             }
         });
     }

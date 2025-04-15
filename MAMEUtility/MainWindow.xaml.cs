@@ -2,16 +2,8 @@
 
 namespace MAMEUtility;
 
-/// <inheritdoc cref="System.Windows.Window" />
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
 public partial class MainWindow
 {
-    /// <inheritdoc />
-    /// <summary>
-    /// Constructor
-    /// </summary>
     public MainWindow()
     {
         InitializeComponent();

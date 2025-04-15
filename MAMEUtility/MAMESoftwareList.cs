@@ -1,29 +1,30 @@
 ﻿using System.Collections.Concurrent;
 using System.IO;
 using System.Xml.Linq;
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameSoftwareList
 {
-    public static async void CreateAndSaveSoftwareList(string inputFolderPath, string outputFilePath, IProgress<int> progress, LogWindow logWindow)
+    public static async Task CreateAndSaveSoftwareListAsync(string inputFolderPath, string outputFilePath, IProgress<int> progress, ILogService logService)
     {
         try
         {
             if (!Directory.Exists(inputFolderPath))
             {
-                logWindow.AppendLog("The specified folder does not exist.");
+                logService.LogError("The specified folder does not exist.");
                 throw new DirectoryNotFoundException("The specified folder does not exist.");
             }
 
             var files = Directory.GetFiles(inputFolderPath, "*.xml");
             if (files.Length == 0)
             {
-                logWindow.AppendLog("No XML files found in the specified folder.");
+                logService.LogError("No XML files found in the specified folder.");
                 throw new FileNotFoundException("No XML files found in the specified folder.");
             }
 
-            logWindow.AppendLog($"Found {files.Length} XML files to process.");
+            logService.Log($"Found {files.Length} XML files to process.");
 
             // Define logging and progress intervals
             const int logInterval = 5; // Log every 5 files
@@ -60,7 +61,7 @@ public static class MameSoftwareList
                     // Log only at intervals
                     if (processed % logInterval == 0 || processed == files.Length)
                     {
-                        logWindow.AppendLog($"Progress: {processed}/{files.Length} files processed.");
+                        logService.Log($"Progress: {processed}/{files.Length} files processed.");
                     }
 
                     // Update progress less frequently
@@ -72,22 +73,24 @@ public static class MameSoftwareList
                 }
                 catch (Exception ex)
                 {
-                    logWindow.AppendLog($"Skipping file '{file}' due to an error: {ex.Message}");
-                    await LogError.LogAsync(ex, $"Skipping file '{file}' due to an error: {ex.Message}");
+                    logService.LogWarning($"Skipping file '{file}' due to an error: {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"Skipping file '{file}' due to an error: {ex.Message}");
                 }
             });
 
-            logWindow.AppendLog("All files processed, saving consolidated XML file...");
+            logService.Log("All files processed, saving consolidated XML file...");
 
             // Convert to list and save
             var outputDoc = new XDocument(new XElement("Softwares", softwareList.ToList()));
             await Task.Run(() => outputDoc.Save(outputFilePath));
 
-            logWindow.AppendLog($"Consolidated XML file saved with {softwareList.Count} software entries to: {outputFilePath}");
+            logService.Log($"Consolidated XML file saved with {softwareList.Count} software entries to: {outputFilePath}");
         }
         catch (Exception ex)
         {
-            await LogError.LogAsync(ex, "Error in method CreateAndSaveSoftwareList");
+            await logService.LogExceptionAsync(ex, "Error in method CreateAndSaveSoftwareListAsync");
+
+            throw;
         }
     }
 }

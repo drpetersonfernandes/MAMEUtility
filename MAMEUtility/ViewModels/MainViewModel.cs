@@ -5,10 +5,6 @@ using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility.ViewModels;
 
-/// <inheritdoc />
-/// <summary>
-/// ViewModel for the MainWindow
-/// </summary>
 public class MainViewModel : BaseViewModel
 {
     private readonly ILogService _logService;
@@ -17,12 +13,6 @@ public class MainViewModel : BaseViewModel
     private int _overallProgress;
     private bool _isProcessing;
 
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="logService">Log service</param>
-    /// <param name="dialogService">Dialog service</param>
-    /// <param name="mameProcessingService">MAME processing service</param>
     public MainViewModel(
         ILogService logService,
         IDialogService dialogService,
@@ -47,18 +37,12 @@ public class MainViewModel : BaseViewModel
         ShowLogCommand = new RelayCommand(ShowLog);
     }
 
-    /// <summary>
-    /// Gets or sets the overall progress
-    /// </summary>
     public int OverallProgress
     {
         get => _overallProgress;
         set => SetProperty(ref _overallProgress, value);
     }
 
-    /// <summary>
-    /// Gets or sets whether an operation is in progress
-    /// </summary>
     public bool IsProcessing
     {
         get => _isProcessing;
@@ -77,69 +61,19 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Gets the command to create a MAME full list
-    /// </summary>
     public RelayCommand CreateMameFullCommand { get; }
-
-    /// <summary>
-    /// Gets the command to create MAME manufacturer lists
-    /// </summary>
     public RelayCommand CreateMameManufacturerCommand { get; }
-
-    /// <summary>
-    /// Gets the command to create MAME year lists
-    /// </summary>
     public RelayCommand CreateMameYearCommand { get; }
-
-    /// <summary>
-    /// Gets the command to create MAME sourcefile lists
-    /// </summary>
     public RelayCommand CreateMameSourcefileCommand { get; }
-
-    /// <summary>
-    /// Gets the command to create a MAME software list
-    /// </summary>
     public RelayCommand CreateMameSoftwareListCommand { get; }
-
-    /// <summary>
-    /// Gets the command to merge lists
-    /// </summary>
     public RelayCommand MergeListsCommand { get; }
-
-    /// <summary>
-    /// Gets the command to copy ROMs
-    /// </summary>
     public RelayCommand CopyRomsCommand { get; }
-
-    /// <summary>
-    /// Gets the command to copy images
-    /// </summary>
     public RelayCommand CopyImagesCommand { get; }
-
-    /// <summary>
-    /// Gets the command to show the donate page
-    /// </summary>
     public RelayCommand DonateCommand { get; }
-
-    /// <summary>
-    /// Gets the command to show the about window
-    /// </summary>
     public RelayCommand AboutCommand { get; }
-
-    /// <summary>
-    /// Gets the command to exit the application
-    /// </summary>
     public RelayCommand ExitCommand { get; }
-
-    /// <summary>
-    /// Gets the command to show the log window
-    /// </summary>
     public RelayCommand ShowLogCommand { get; }
 
-    /// <summary>
-    /// Creates a MAME full list
-    /// </summary>
     private async void CreateMameFull()
     {
         try
@@ -188,9 +122,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Creates MAME manufacturer lists
-    /// </summary>
     private async void CreateMameManufacturer()
     {
         try
@@ -236,9 +167,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Creates MAME year lists
-    /// </summary>
     private async void CreateMameYear()
     {
         try
@@ -284,9 +212,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Creates MAME sourcefile lists
-    /// </summary>
     private async void CreateMameSourcefile()
     {
         try
@@ -332,9 +257,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Creates a MAME software list
-    /// </summary>
     private async void CreateMameSoftwareList()
     {
         try
@@ -380,9 +302,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Merges lists
-    /// </summary>
     private async void MergeLists()
     {
         try
@@ -433,9 +352,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Copies ROMs
-    /// </summary>
     private async void CopyRoms()
     {
         try
@@ -491,9 +407,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Copies images
-    /// </summary>
     private async void CopyImages()
     {
         try
@@ -549,9 +462,6 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Opens the donate page
-    /// </summary>
     private void Donate()
     {
         try
@@ -570,34 +480,21 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Shows the about window
-    /// </summary>
     private void ShowAbout()
     {
         _dialogService.ShowAboutWindow();
     }
 
-    /// <summary>
-    /// Shows the log window
-    /// </summary>
     private void ShowLog()
     {
         _logService.ShowLogWindow();
     }
 
-    /// <summary>
-    /// Exits the application
-    /// </summary>
-    private void Exit()
+    private static void Exit()
     {
         System.Windows.Application.Current.Shutdown();
     }
 
-    /// <summary>
-    /// Determines whether a command can be executed
-    /// </summary>
-    /// <returns>True if the command can be executed, otherwise false</returns>
     private bool CanExecuteCommand()
     {
         return !IsProcessing;

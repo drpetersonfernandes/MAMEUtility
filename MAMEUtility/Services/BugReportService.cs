@@ -6,36 +6,13 @@ using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility.Services;
 
-/// <inheritdoc />
-/// <summary>
-/// Implementation of the IBugReportService interface
-/// </summary>
-public class BugReportService : IBugReportService
+public class BugReportService(string apiUrl, string apiKey, string applicationName = "MAME Utility") : IBugReportService
 {
-    private readonly string _apiUrl;
-    private readonly string _apiKey;
-    private readonly string _applicationName;
+    private readonly string _apiUrl = apiUrl;
+    private readonly string _apiKey = apiKey;
+    private readonly string _applicationName = applicationName;
     private readonly HttpClient _httpClient = new();
 
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="apiUrl">API URL for bug reporting</param>
-    /// <param name="apiKey">API key for bug reporting</param>
-    /// <param name="applicationName">Application name</param>
-    public BugReportService(string apiUrl, string apiKey, string applicationName = "MAME Utility")
-    {
-        _apiUrl = apiUrl;
-        _apiKey = apiKey;
-        _applicationName = applicationName;
-    }
-
-    /// <inheritdoc />
-    /// <summary>
-    /// Sends an exception report to the bug reporting service
-    /// </summary>
-    /// <param name="exception">Exception to report</param>
-    /// <returns>Task representing the asynchronous operation</returns>
     public async Task SendExceptionReportAsync(Exception exception)
     {
         try
@@ -50,11 +27,6 @@ public class BugReportService : IBugReportService
         }
     }
 
-    /// <summary>
-    /// Sends a report to the bug reporting service
-    /// </summary>
-    /// <param name="message">Message to send</param>
-    /// <returns>Task representing the asynchronous operation</returns>
     private async Task SendReportAsync(string message)
     {
         try
@@ -80,11 +52,6 @@ public class BugReportService : IBugReportService
         }
     }
 
-    /// <summary>
-    /// Formats an exception message for bug reporting
-    /// </summary>
-    /// <param name="exception">Exception to format</param>
-    /// <returns>Formatted message</returns>
     private static string FormatExceptionMessage(Exception exception)
     {
         var sb = new StringBuilder();
@@ -111,16 +78,10 @@ public class BugReportService : IBugReportService
         return sb.ToString();
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Disposes resources
-    /// </summary>
     public void Dispose()
     {
-        // Dispose of the HttpClient to release resources
         _httpClient?.Dispose();
 
-        // Suppress finalization
         GC.SuppressFinalize(this);
     }
 }

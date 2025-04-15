@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
-using System.Globalization;
 using System.IO;
-using System.Text;
+using System.Text; // Added for StringBuilder
+using System.Globalization; // Added for CultureInfo
 using System.Windows;
 using System.Windows.Threading;
 using MAMEUtility.Services.Interfaces;
@@ -10,10 +10,6 @@ using MessageBox = System.Windows.MessageBox;
 
 namespace MAMEUtility.Services;
 
-/// <inheritdoc cref="System.IDisposable" />
-/// <summary>
-/// Implementation of the ILogService interface
-/// </summary>
 public class LogService : ILogService, IDisposable
 {
     private readonly IBugReportService _bugReportService;
@@ -22,20 +18,12 @@ public class LogService : ILogService, IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly SemaphoreSlim _logFileSemaphore = new(1, 1); // For thread-safe file access
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Event raised when a log message is added
-    /// </summary>
     public event EventHandler<string>? LogMessageAdded;
 
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="bugReportService">Bug report service</param>
     public LogService(IBugReportService bugReportService)
     {
         _bugReportService = bugReportService;
-        _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ErrorLog.txt");
+        _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MAMEUtilityLog.txt");
 
         // Get the UI thread dispatcher
         _dispatcher = Application.Current.Dispatcher;
@@ -51,200 +39,158 @@ public class LogService : ILogService, IDisposable
         }
         catch (Exception ex)
         {
-            // Just write to debug output since we can't log yet
-            Debug.WriteLine($"Error creating log directory: {ex.Message}");
+            Debug.WriteLine($"Error initializing log directory/file: {ex.Message}");
         }
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Shows the log window
-    /// </summary>
     public void ShowLogWindow()
     {
         // Ensure this runs on the UI thread
-        if (!_dispatcher.CheckAccess())
-        {
-            _dispatcher.Invoke(ShowLogWindow);
-            return;
-        }
+        if (_dispatcher.CheckAccess()) return;
 
-        if (_logWindow == null)
-        {
-            _logWindow = new LogWindow();
-            _logWindow.Closed += (_, _) => { _logWindow = null; };
-            _logWindow.Show();
-        }
-        else
-        {
-            _logWindow.Activate();
-        }
+        _dispatcher.Invoke(ShowLogWindow);
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Logs a regular message
-    /// </summary>
-    /// <param name="message">Message to log</param>
-    public async void Log(string message)
+    public void Log(string message)
     {
         try
         {
-            // Don't log empty messages
-            if (string.IsNullOrWhiteSpace(message))
-                return;
+            if (string.IsNullOrWhiteSpace(message)) return;
 
-            AppendToLogWindow(message);
+            var formattedMessage = FormatLogMessage(message, LogLevel.Info);
+            AppendToLogWindow(formattedMessage);
+            _ = LogToFileAsync(formattedMessage);
 
-            // Using await instead of fire-and-forget to prevent warning
-            await LogToFileAsync(FormatLogMessage(message, LogLevel.Info));
-
-            // Ensure event is raised on the UI thread
             _dispatcher.BeginInvoke(() => LogMessageAdded?.Invoke(this, message));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // TODO handle exception
+            Debug.WriteLine($"Error during Log operation: {ex.Message}");
+            _ = LogToFileAsync($"[LogService Internal Error] Failed during Log: {ex.Message}{Environment.NewLine}");
         }
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Logs an error message
-    /// </summary>
-    /// <param name="message">Error message to log</param>
-    public async void LogError(string message)
+    public void LogError(string message)
     {
         try
         {
-            // Don't log empty messages
-            if (string.IsNullOrWhiteSpace(message))
-                return;
+            if (string.IsNullOrWhiteSpace(message)) return;
 
-            AppendToLogWindow(message);
+            var formattedMessage = FormatLogMessage(message, LogLevel.Error);
+            AppendToLogWindow(formattedMessage);
+            _ = LogToFileAsync(formattedMessage);
 
-            // Using await instead of fire-and-forget to prevent warning
-            await LogToFileAsync(FormatLogMessage(message, LogLevel.Error));
-
-            // Ensure UI interaction happens on the UI thread
             _dispatcher.BeginInvoke(() =>
             {
                 AskUserToOpenLogFile();
                 LogMessageAdded?.Invoke(this, message);
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // TODO handle exception
+            Debug.WriteLine($"Error during LogError operation: {ex.Message}");
+            _ = LogToFileAsync($"[LogService Internal Error] Failed during LogError: {ex.Message}{Environment.NewLine}");
         }
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Logs a warning message
-    /// </summary>
-    /// <param name="message">Warning message to log</param>
-    public async void LogWarning(string message)
+    public void LogWarning(string message)
     {
         try
         {
-            // Don't log empty messages
-            if (string.IsNullOrWhiteSpace(message))
-                return;
+            if (string.IsNullOrWhiteSpace(message)) return;
 
-            AppendToLogWindow(message);
+            var formattedMessage = FormatLogMessage(message, LogLevel.Warning);
+            AppendToLogWindow(formattedMessage);
+            _ = LogToFileAsync(formattedMessage);
 
-            // Using await instead of fire-and-forget to prevent warning
-            await LogToFileAsync(FormatLogMessage(message, LogLevel.Warning));
-
-            // Ensure UI interaction happens on the UI thread
             _dispatcher.BeginInvoke(() =>
             {
                 AskUserToOpenLogFile(MessageBoxImage.Warning);
                 LogMessageAdded?.Invoke(this, message);
             });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // TODO handle exception
+            Debug.WriteLine($"Error during LogWarning operation: {ex.Message}");
+            _ = LogToFileAsync($"[LogService Internal Error] Failed during LogWarning: {ex.Message}{Environment.NewLine}");
         }
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Logs an exception
-    /// </summary>
-    /// <param name="exception">Exception to log</param>
-    /// <param name="additionalInfo">Additional contextual information</param>
-    /// <returns>Task representing the asynchronous operation</returns>
     public async Task LogExceptionAsync(Exception exception, string additionalInfo = "")
     {
         try
         {
-            // Format the error message
+            if (exception == null)
+            {
+                LogWarning("LogExceptionAsync called with null exception.");
+                return;
+            }
+
             var errorMessage = FormatExceptionMessage(exception, additionalInfo);
+            var userMessage = $"Error: {exception.GetType().Name} - {exception.Message}";
 
-            // Append to log window
-            AppendToLogWindow($"Error: {exception.Message}");
-
-            // Log to file
+            AppendToLogWindow(userMessage);
             await LogToFileAsync(errorMessage);
-
-            // Send to API
             await _bugReportService.SendExceptionReportAsync(exception);
 
-            // Ask user if they want to open the log file - must be on UI thread
-            _dispatcher.BeginInvoke(() =>
-            {
-                AskUserToOpenLogFile();
-                LogMessageAdded?.Invoke(this, $"Error: {exception.Message}");
-            });
+            AskUserToOpenLogFile();
+            LogMessageAdded?.Invoke(this, userMessage);
         }
         catch (Exception ex)
         {
-            // If an error occurs during logging, at least try to write it to the file
+            Debug.WriteLine($"Error during LogExceptionAsync: {ex.Message}");
             try
             {
-                await LogToFileAsync($"Error in logging: {ex.Message}\nOriginal exception: {exception.Message}\n");
+                var fallbackMsg = $"[LogService Internal Error] Error in LogExceptionAsync: {ex.Message}{Environment.NewLine}" +
+                                  $"Original exception: {exception?.GetType().Name} - {exception?.Message}{Environment.NewLine}";
+                await LogToFileAsync(fallbackMsg);
             }
             catch
             {
-                // Last resort - write to debug output
-                Debug.WriteLine($"Critical failure in logging: {ex.Message}");
-                Debug.WriteLine($"Original exception: {exception.Message}");
+                Debug.WriteLine("Critical failure in logging.");
+                if (exception != null) Debug.WriteLine($"Original exception: {exception.Message}");
             }
         }
     }
 
-    /// <summary>
-    /// Appends a message to the log window
-    /// </summary>
-    /// <param name="message">Message to append</param>
-    private void AppendToLogWindow(string message)
+    private void AppendToLogWindow(string formattedMessage)
     {
-        if (_logWindow == null) return;
+        if (!_dispatcher.CheckAccess())
+        {
+            _dispatcher.BeginInvoke(() => AppendToLogWindowInternal(formattedMessage));
 
-        // Use Dispatcher to ensure UI updates happen on the UI thread
-        _dispatcher.BeginInvoke(() => _logWindow.AppendLog(message));
+            return;
+        }
+
+        AppendToLogWindowInternal(formattedMessage);
     }
 
-    /// <summary>
-    /// Logs a message to the error log file
-    /// </summary>
-    /// <param name="message">Message to log</param>
-    /// <returns>Task representing the asynchronous operation</returns>
-    private async Task LogToFileAsync(string message)
+    private void AppendToLogWindowInternal(string formattedMessage)
     {
-        // Use semaphore for thread-safe file access
-        await _logFileSemaphore.WaitAsync();
         try
         {
-            await File.AppendAllTextAsync(_logFilePath, message);
+            if (_logWindow is { IsLoaded: true })
+            {
+                _logWindow.AppendLog(formattedMessage.TrimEnd(Environment.NewLine.ToCharArray()));
+            }
         }
         catch (Exception ex)
         {
-            // Write to debug output since we can't log the logging error
-            Debug.WriteLine($"Error writing to log file: {ex.Message}");
+            Debug.WriteLine($"Error appending to log window: {ex.Message}");
+        }
+    }
+
+    private async Task LogToFileAsync(string formattedMessage)
+    {
+        await _logFileSemaphore.WaitAsync();
+        try
+        {
+            await using var writer = new StreamWriter(_logFilePath, true, Encoding.UTF8);
+            await writer.WriteAsync(formattedMessage);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error writing to log file '{_logFilePath}': {ex.Message}");
         }
         finally
         {
@@ -252,113 +198,116 @@ public class LogService : ILogService, IDisposable
         }
     }
 
-    /// <summary>
-    /// Formats a log message
-    /// </summary>
-    /// <param name="message">Message to format</param>
-    /// <param name="level">Log level</param>
-    /// <returns>Formatted message</returns>
     private static string FormatLogMessage(string message, LogLevel level)
     {
-        var sb = new StringBuilder();
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Date/Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Level: {level}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Message: {message}");
-
-        // Add version info
-        sb.AppendLine(CultureInfo.InvariantCulture, $"App Version: {AboutWindow.ApplicationVersion}");
-
-        sb.AppendLine(new string('-', 80)); // Separator line
-        return sb.ToString();
+        return $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level,-7}] {message}{Environment.NewLine}";
     }
 
-    /// <summary>
-    /// Formats an exception message for logging
-    /// </summary>
-    /// <param name="exception">Exception to format</param>
-    /// <param name="additionalInfo">Additional contextual information</param>
-    /// <returns>Formatted message</returns>
-    private static string FormatExceptionMessage(Exception exception, string additionalInfo)
+    private static string FormatExceptionMessage(Exception exception, string additionalInfo = "")
     {
         var sb = new StringBuilder();
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Date/Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}");
-
-        if (!string.IsNullOrEmpty(additionalInfo))
+        sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture));
+        sb.Append(" [Exception] ");
+        if (!string.IsNullOrWhiteSpace(additionalInfo))
         {
-            sb.AppendLine(CultureInfo.InvariantCulture, $"Additional Info: {additionalInfo}");
+            sb.Append(CultureInfo.InvariantCulture, $"Context: {additionalInfo} | ");
         }
 
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Exception: {exception.GetType().Name}");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Type: {exception.GetType().FullName}");
         sb.AppendLine(CultureInfo.InvariantCulture, $"Message: {exception.Message}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Stack Trace: {exception.StackTrace}");
+        sb.AppendLine("--- Stack Trace ---");
+        sb.AppendLine(exception.StackTrace ?? "No stack trace available.");
+        sb.AppendLine("--- End Stack Trace ---");
 
-        // Add version info
-        sb.AppendLine(CultureInfo.InvariantCulture, $"App Version: {AboutWindow.ApplicationVersion}");
-
-        // Add OS info
-        sb.AppendLine(CultureInfo.InvariantCulture, $"OS: {Environment.OSVersion}");
-        sb.AppendLine(CultureInfo.InvariantCulture, $".NET Version: {Environment.Version}");
-
-        // Add inner exception info if present
-        if (exception.InnerException != null)
+        var inner = exception.InnerException;
+        var innerLevel = 1;
+        while (inner != null)
         {
-            sb.AppendLine("\nInner Exception:");
-            sb.AppendLine(CultureInfo.InvariantCulture, $"Type: {exception.InnerException.GetType().Name}");
-            sb.AppendLine(CultureInfo.InvariantCulture, $"Message: {exception.InnerException.Message}");
-            sb.AppendLine(CultureInfo.InvariantCulture, $"Stack Trace: {exception.InnerException.StackTrace}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"\n--- Inner Exception Level {innerLevel} ---");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Type: {inner.GetType().FullName}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Message: {inner.Message}");
+            sb.AppendLine("--- Inner Stack Trace ---");
+            sb.AppendLine(inner.StackTrace ?? "No inner stack trace available.");
+            sb.AppendLine("--- End Inner Stack Trace ---");
+            inner = inner.InnerException;
+            innerLevel++;
         }
 
-        sb.AppendLine(new string('-', 80)); // Separator line
+        sb.AppendLine("--- End Exception Details ---");
+        sb.AppendLine(); // Add a blank line for separation in the log file
+
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Asks the user if they want to open the error log file
-    /// </summary>
-    /// <param name="messageBoxImage">Type of message box to show</param>
     private void AskUserToOpenLogFile(MessageBoxImage messageBoxImage = MessageBoxImage.Error)
     {
-        // This should only be called from the UI thread
         if (!_dispatcher.CheckAccess())
         {
-            _dispatcher.Invoke(() => AskUserToOpenLogFile(messageBoxImage));
+            Debug.WriteLine("Warning: AskUserToOpenLogFile called from non-UI thread directly.");
+            _dispatcher.BeginInvoke(() => AskUserToOpenLogFileInternal(messageBoxImage));
+
             return;
         }
 
-        var title = messageBoxImage == MessageBoxImage.Warning ? "Warning Occurred" : "Error Occurred";
-        var message = $"A {(messageBoxImage == MessageBoxImage.Warning ? "warning" : "error")} has occurred and has been logged. Would you like to open the log file?";
+        AskUserToOpenLogFileInternal(messageBoxImage);
+    }
 
-        var result = MessageBox.Show(
-            message,
-            title,
-            MessageBoxButton.YesNo,
-            messageBoxImage);
-
-        if (result != MessageBoxResult.Yes) return;
-
+    private void AskUserToOpenLogFileInternal(MessageBoxImage messageBoxImage)
+    {
         try
         {
-            // Open the log file with the default application
-            Process.Start(new ProcessStartInfo
+            var title = messageBoxImage == MessageBoxImage.Warning ? "Warning Occurred" : "Error Occurred";
+            var message = $"A {(messageBoxImage == MessageBoxImage.Warning ? "warning" : "critical error")} has occurred and has been logged.\n\nWould you like to open the log file?\n({_logFilePath})";
+
+            var result = MessageBox.Show(message, title, MessageBoxButton.YesNo, messageBoxImage);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            if (!File.Exists(_logFilePath))
             {
-                FileName = _logFilePath,
-                UseShellExecute = true
-            });
+                MessageBox.Show($"Log file not found at:\n{_logFilePath}", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var psi = new ProcessStartInfo(_logFilePath)
+            {
+                UseShellExecute = true // Necessary to open with default app
+            };
+            Process.Start(psi);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not open log file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Debug.WriteLine($"Error showing 'Open Log File' dialog or opening file: {ex.Message}");
+            try
+            {
+                MessageBox.Show($"Could not open log file: {ex.Message}", "Error Opening Log", MessageBoxButton.OK, MessageBoxImage.Error);
+                _ = LogToFileAsync($"[LogService Internal Error] Failed to open log file via dialog: {ex.Message}{Environment.NewLine}");
+            }
+            catch
+            {
+                /* Silently fail */
+            }
         }
     }
 
-    /// <inheritdoc />
-    /// <summary>
-    /// Disposes managed resources
-    /// </summary>
     public void Dispose()
     {
-        _logFileSemaphore.Dispose();
-
+        Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    private bool _disposed;
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            _logFileSemaphore?.Dispose();
+        }
+
+        _logWindow = null;
+        _disposed = true;
     }
 }

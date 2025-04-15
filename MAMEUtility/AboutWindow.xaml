@@ -10,7 +10,6 @@
     Height="400"
     d:DataContext="{d:DesignInstance Type=viewModels:AboutViewModel}"
     Background="#F5F5F5"
-    Icon="/images/logo.png"
     ResizeMode="NoResize"
     WindowStartupLocation="CenterOwner"
     mc:Ignorable="d">
@@ -55,16 +54,10 @@
                 <TextBlock HorizontalAlignment="Center">
                     <Hyperlink 
                         Command="{Binding NavigateCommand}" 
-                        CommandParameter="https://purelogiccode.com">
-                        Visit our website
+                        CommandParameter="https://www.purelogiccode.com">
+                        https://www.purelogiccode.com
                     </Hyperlink>
                 </TextBlock>
-                <TextBlock 
-                    Margin="0,10,0,0" 
-                    Text="© 2025 PureLogicCode. All rights reserved." 
-                    HorizontalAlignment="Center"
-                    FontSize="12"
-                    Foreground="#666666"/>
             </StackPanel>
 
             <!-- Close button -->

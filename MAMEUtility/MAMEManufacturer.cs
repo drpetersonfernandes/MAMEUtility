@@ -2,14 +2,15 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using MAMEUtility.Services.Interfaces; // Added
 
 namespace MAMEUtility;
 
 public partial class MameManufacturer
 {
-    public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress, LogWindow logWindow)
+    public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress, ILogService logService)
     {
-        logWindow.AppendLog($"Output folder for MAME Manufacturer: {outputFolderMameManufacturer}");
+        logService.Log($"Output folder for MAME Manufacturer: {outputFolderMameManufacturer}");
 
         try
         {
@@ -27,7 +28,7 @@ public partial class MameManufacturer
             const int logInterval = 10; // Log every 10 manufacturers
             const int progressInterval = 5; // Update progress every 5 manufacturers
 
-            logWindow.AppendLog($"Found {totalManufacturers} unique manufacturers to process.");
+            logService.Log($"Found {totalManufacturers} unique manufacturers to process.");
 
             // Use a dictionary to track processed manufacturer names and their safe filenames
             var processedManufacturers = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -79,10 +80,10 @@ public partial class MameManufacturer
                     // Log only at intervals
                     if (processed % logInterval == 0 || processed == totalManufacturers)
                     {
-                        logWindow.AppendLog($"Progress: {processed}/{totalManufacturers} manufacturers processed.");
+                        logService.Log($"Progress: {processed}/{totalManufacturers} manufacturers processed.");
                     }
 
-                    // Update progress less frequently
+                    // Update progress
                     if (processed % progressInterval == 0 || processed == totalManufacturers)
                     {
                         var progressPercentage = (double)processed / totalManufacturers * 100;
@@ -91,24 +92,22 @@ public partial class MameManufacturer
                 }
                 catch (IOException ex)
                 {
-                    // Log the file access error but continue processing other manufacturers
-                    logWindow.AppendLog($"File access error processing manufacturer '{manufacturer}': {ex.Message}");
-                    await LogError.LogAsync(ex, $"File access error processing manufacturer '{manufacturer}'");
+                    logService.LogError($"File access error processing manufacturer '{manufacturer}': {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"File access error processing manufacturer '{manufacturer}'");
                 }
                 catch (Exception ex)
                 {
-                    // Log other errors but continue processing
-                    logWindow.AppendLog($"Error processing manufacturer '{manufacturer}': {ex.Message}");
-                    await LogError.LogAsync(ex, $"Error processing manufacturer '{manufacturer}'");
+                    logService.LogError($"Error processing manufacturer '{manufacturer}': {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"Error processing manufacturer '{manufacturer}'");
                 }
             }
 
-            logWindow.AppendLog("All manufacturer files created successfully.");
+            logService.Log("All manufacturer files created successfully.");
         }
         catch (Exception ex)
         {
-            logWindow.AppendLog("An error occurred: " + ex.Message);
-            await LogError.LogAsync(ex, "Error in method MAMEManufacturer.CreateAndSaveMameManufacturerAsync");
+            logService.LogError("An error occurred: " + ex.Message);
+            await logService.LogExceptionAsync(ex, "Error in method MAMEManufacturer.CreateAndSaveMameManufacturerAsync");
         }
     }
 
@@ -132,11 +131,6 @@ public partial class MameManufacturer
         bool Predicate(XElement machine)
         {
             return (machine.Element("manufacturer")?.Value ?? "") == manufacturer &&
-                   //!(machine.Attribute("name")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                   //!(machine.Element("description")?.Value.Contains("bootleg", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                   //!(machine.Element("description")?.Value.Contains("prototype", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                   //!(machine.Element("description")?.Value.Contains("playchoice", StringComparison.InvariantCultureIgnoreCase) ?? false) &&
-                   //machine.Attribute("cloneof") == null &&
                    !(machine.Attribute("name")?.Value.Contains("bios", StringComparison.InvariantCultureIgnoreCase) ??
                      false) &&
                    !(machine.Element("description")?.Value
