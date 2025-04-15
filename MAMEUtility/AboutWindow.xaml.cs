@@ -1,33 +1,35 @@
-﻿using System.Diagnostics;
-using System.Reflection;
-using System.Windows;
-using System.Windows.Navigation;
+﻿using System.Reflection;
+using MAMEUtility.ViewModels;
 
 namespace MAMEUtility;
 
+/// <inheritdoc cref="System.Windows.Window" />
+/// <summary>
+/// Interaction logic for AboutWindow.xaml
+/// </summary>
 public partial class AboutWindow
 {
+    /// <inheritdoc />
+    /// <summary>
+    /// Constructor
+    /// </summary>
     public AboutWindow()
     {
         InitializeComponent();
-        DataContext = this; // Set the data context for data binding
+
+        // Get the view model
+        var viewModel = ServiceLocator.Instance.Resolve<AboutViewModel>();
+
+        // Set the data context
+        DataContext = viewModel;
+
+        // Subscribe to close event
+        viewModel.CloseRequested += (_, _) => Close();
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
-
-    private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
-    {
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = e.Uri.AbsoluteUri,
-            UseShellExecute = true
-        });
-        e.Handled = true;
-    }
-
+    /// <summary>
+    /// Gets the application version
+    /// </summary>
     public static string ApplicationVersion
     {
         get

@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Threading;
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
@@ -9,30 +10,25 @@ namespace MAMEUtility;
 /// </summary>
 public partial class App : IDisposable
 {
-    private BugReportService? _bugReportService;
-    private LogError? _logError;
+    private ILogService? _logService;
 
-    // Static property to access the LogWindow from anywhere
-    public static LogWindow? SharedLogWindow { get; set; }
-
+    /// <inheritdoc />
+    /// <summary>
+    /// Called when the application starts up
+    /// </summary>
+    /// <param name="e">Startup event arguments</param>
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        // Create the shared LogWindow
-        SharedLogWindow = new LogWindow();
-        SharedLogWindow.Show();
+        // Initialize service locator
+        var serviceLocator = ServiceLocator.Instance;
 
-        // Initialize bug report service using configuration
-        var config = AppConfig.Instance;
-        _bugReportService = new BugReportService(
-            config.BugReportApiUrl,
-            config.BugReportApiKey
-        );
+        // Get the log service
+        _logService = serviceLocator.Resolve<ILogService>();
 
-        // Initialize error logging
-        _logError = new LogError(_bugReportService);
-        LogError.Initialize(_bugReportService);
+        // Initialize LogWindow
+        _logService.ShowLogWindow();
 
         // Set up global exception handling
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -40,6 +36,11 @@ public partial class App : IDisposable
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
     }
 
+    /// <summary>
+    /// Handles unhandled exceptions in the AppDomain
+    /// </summary>
+    /// <param name="sender">Event sender</param>
+    /// <param name="e">Event arguments</param>
     private void OnUnhandledException(object? sender, UnhandledExceptionEventArgs e)
     {
         if (e.ExceptionObject is Exception exception)
@@ -48,6 +49,11 @@ public partial class App : IDisposable
         }
     }
 
+    /// <summary>
+    /// Handles unhandled exceptions in the Dispatcher
+    /// </summary>
+    /// <param name="sender">Event sender</param>
+    /// <param name="e">Event arguments</param>
     private void OnDispatcherUnhandledException(object? sender, DispatcherUnhandledExceptionEventArgs e)
     {
         LogAndReportException(e.Exception);
@@ -56,23 +62,28 @@ public partial class App : IDisposable
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Handles unobserved task exceptions
+    /// </summary>
+    /// <param name="sender">Event sender</param>
+    /// <param name="e">Event arguments</param>
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         LogAndReportException(e.Exception);
         e.SetObserved();
     }
 
+    /// <summary>
+    /// Logs and reports an exception
+    /// </summary>
+    /// <param name="exception">Exception to log and report</param>
     private void LogAndReportException(Exception exception)
     {
         try
         {
-            // Log exception to console for debugging purposes
-            SharedLogWindow?.AppendLog($"Error: {exception.Message}");
-
-            // Use our LogError class to handle the exception
-            if (_logError != null)
+            if (_logService != null)
             {
-                _ = _logError.LogExceptionAsync(exception);
+                _ = _logService.LogExceptionAsync(exception);
             }
         }
         catch
@@ -81,21 +92,16 @@ public partial class App : IDisposable
         }
     }
 
+    /// <inheritdoc />
+    /// <summary>
+    /// Disposes resources
+    /// </summary>
     public void Dispose()
     {
         // Unregister from event handlers to prevent memory leaks
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
-
-        // Dispose the bug report service if it exists
-        if (_bugReportService != null)
-        {
-            _bugReportService.Dispose();
-            _bugReportService = null;
-        }
-
-        // Don't close the LogWindow here as MainWindow might still be using it
 
         // Suppress finalization
         GC.SuppressFinalize(this);
