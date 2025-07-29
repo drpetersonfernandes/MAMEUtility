@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 using MAMEUtility.Services.Interfaces;
-using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
+using Microsoft.Win32; // Use this for OpenFolderDialog
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
@@ -66,14 +66,14 @@ public class DialogService : IDialogService
 
     public string? ShowFolderBrowserDialog(string description)
     {
-        var dialog = new FolderBrowserDialog
+        var dialog = new OpenFolderDialog
         {
-            Description = description
+            Title = description
         };
 
-        if (dialog.ShowDialog() == DialogResult.OK)
+        if (dialog.ShowDialog() == true)
         {
-            return dialog.SelectedPath;
+            return dialog.FolderName;
         }
 
         return null;

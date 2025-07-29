@@ -100,7 +100,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error creating software list from folder: {inputFolderPath}");
-            throw; // Re-throw to signal failure to the ViewModel
+            throw;
         }
     }
 
@@ -117,7 +117,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error merging lists to {xmlOutputPath} / {datOutputPath}");
-            throw; // Re-throw to signal failure to the ViewModel
+            throw;
         }
     }
 
@@ -135,7 +135,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error copying ROMs from {sourceDirectory} to {destinationDirectory}");
-            throw; // Re-throw to signal failure to the ViewModel
+            throw;
         }
     }
 
@@ -153,7 +153,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error copying images from {sourceDirectory} to {destinationDirectory}");
-            throw; // Re-throw to signal failure to the ViewModel
+            throw;
         }
     }
 }

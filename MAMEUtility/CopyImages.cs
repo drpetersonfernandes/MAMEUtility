@@ -10,7 +10,6 @@ public static class CopyImages
     {
         var totalFiles = xmlFilePaths.Length;
         var filesProcessed = 0;
-        var overallProgressPercentage = 0; // Track overall progress
 
         // Define logging intervals
         const int logInterval = 5; // Log progress every 5 files
@@ -44,17 +43,14 @@ public static class CopyImages
         {
             try
             {
-                // Pass a specific progress reporter for this file
                 var processed = filesProcessed;
                 var fileProgress = new Progress<int>(percent =>
                 {
                     // Calculate weighted progress
                     var weightedPercentage = (double)processed / totalFiles * 100 + (double)percent / totalFiles;
-                    overallProgressPercentage = (int)weightedPercentage;
-                    progress.Report(overallProgressPercentage);
+                    progress.Report((int)weightedPercentage);
                 });
 
-                // ProcessXmlFileAsync now handles its own progress reporting via fileProgress
                 await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, fileProgress, logService);
 
                 filesProcessed++;
@@ -65,21 +61,13 @@ public static class CopyImages
                     logService.Log($"Overall Progress: {filesProcessed}/{totalFiles} XML files processed.");
                 }
 
-                // Ensure final progress is 100% if all files processed
-                if (filesProcessed == totalFiles)
-                {
-                    progress.Report(100);
-                }
-                else // Report progress based on completed files if not the last one
-                {
-                    progress.Report((int)((double)filesProcessed / totalFiles * 100));
-                }
+                // Report progress based on completed files
+                progress.Report((int)((double)filesProcessed / totalFiles * 100));
             }
             catch (Exception ex)
             {
                 logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
                 await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
-                // Optionally continue
             }
         }
 
@@ -89,11 +77,10 @@ public static class CopyImages
     private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress, ILogService logService)
     {
         XDocument xmlDoc;
-        var fileName = Path.GetFileName(xmlFilePath); // Cache filename
+        var fileName = Path.GetFileName(xmlFilePath);
 
         try
         {
-            // Load XML asynchronously
             xmlDoc = await Task.Run(() => XDocument.Load(xmlFilePath));
             logService.Log($"Successfully loaded XML file: {fileName}");
         }
@@ -101,13 +88,13 @@ public static class CopyImages
         {
             await logService.LogExceptionAsync(ex, $"Failed to load XML file: {xmlFilePath}");
             logService.LogError($"Failed to load XML file: {fileName}. Skipping this file.");
-            return; // Skip this file
+            return;
         }
 
         if (!ValidateXmlStructure(xmlDoc))
         {
             logService.LogWarning($"The file {fileName} does not match the required XML structure. Skipping this file.");
-            return; // Skip this file
+            return;
         }
 
         var machineNames = xmlDoc.Descendants("Machine")
@@ -119,34 +106,28 @@ public static class CopyImages
         if (totalMachines == 0)
         {
             logService.Log($"No machine entries found in {fileName}.");
-            progress.Report(100); // Report 100% for this empty file
+            progress.Report(100);
             return;
         }
 
         var machinesProcessed = 0;
-
-        // Define logging intervals for internal processing
-        const int internalLogInterval = 100; // Log every 100 machines
-        const int internalProgressInterval = 50; // Update progress every 50 machines
+        const int internalLogInterval = 100;
+        const int internalProgressInterval = 50;
 
         logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting sequential image copy check...");
 
-        // *** MODIFICATION: Use sequential foreach loop ***
         foreach (var machineName in machineNames)
         {
-            // ProcessMachine is now synchronous
             if (machineName != null) ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
 
             machinesProcessed++;
 
-            // Update progress at intervals
             if (machinesProcessed % internalProgressInterval == 0 || machinesProcessed == totalMachines)
             {
                 var progressPercentage = (double)machinesProcessed / totalMachines * 100;
                 progress.Report((int)progressPercentage);
             }
 
-            // Log at intervals
             if (machinesProcessed % internalLogInterval == 0 || machinesProcessed == totalMachines)
             {
                 logService.Log($"Image copy progress for {fileName}: {machinesProcessed}/{totalMachines} machines checked.");
@@ -154,28 +135,24 @@ public static class CopyImages
         }
 
         logService.Log($"Completed processing {machinesProcessed} machines from {fileName}");
-        progress.Report(100); // Ensure 100% is reported for this file
+        progress.Report(100);
     }
 
-    // *** MODIFICATION: Made synchronous (removed async Task) ***
     private static void ProcessMachine(string machineName, string sourceDirectory, string destinationDirectory, ILogService logService)
     {
         try
         {
-            // CopyImageFile is now synchronous
             CopyImageFile(sourceDirectory, destinationDirectory, machineName, "png", logService);
             CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpg", logService);
             CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpeg", logService);
         }
-        catch (Exception ex) // Catch exceptions during the processing of a single machine's images
+        catch (Exception ex)
         {
             logService.LogError($"Error processing images for {machineName}: {ex.Message}");
-            // Queue exception logging
             _ = logService.LogExceptionAsync(ex, $"Error processing images for {machineName}");
         }
     }
 
-    // *** MODIFICATION: Made synchronous (removed Task.Run and async/Task return type) ***
     private static void CopyImageFile(string sourceDirectory, string destinationDirectory, string? machineName, string extension, ILogService logService)
     {
         if (string.IsNullOrEmpty(machineName))
@@ -191,15 +168,8 @@ public static class CopyImages
         {
             if (File.Exists(sourceFile))
             {
-                // logService.Log($"Copying: {machineName}.{extension} to {destinationDirectory}"); // Optional: Verbose
-                File.Copy(sourceFile, destinationFile, true); // Overwrite if exists
-                // logService.Log($"Copied: {machineName}.{extension}"); // Optional: Verbose
+                File.Copy(sourceFile, destinationFile, true);
             }
-            // No need to log if file not found unless debugging verbosely
-            // else
-            // {
-            //     logService.Log($"Image file not found: {sourceFile}");
-            // }
         }
         catch (IOException ioEx)
         {
@@ -215,10 +185,9 @@ public static class CopyImages
 
     private static bool ValidateXmlStructure(XDocument xmlDoc)
     {
-        var isValid = xmlDoc.Root?.Name.LocalName == "Machines" &&
-                      xmlDoc.Descendants("Machine").Any(static machine =>
-                          machine.Element("MachineName") != null &&
-                          machine.Element("Description") != null);
-        return isValid;
+        return xmlDoc.Root?.Name.LocalName == "Machines" &&
+               xmlDoc.Descendants("Machine").Any(static machine =>
+                   machine.Element("MachineName") != null &&
+                   machine.Element("Description") != null);
     }
 }

@@ -4,11 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:viewModels="clr-namespace:MAMEUtility.ViewModels"
     Title="About MAME Utility"
     Width="400"
     Height="400"
-    d:DataContext="{d:DesignInstance Type=viewModels:AboutViewModel}"
     Background="#F5F5F5"
     ResizeMode="NoResize"
     WindowStartupLocation="CenterOwner"
@@ -43,8 +41,8 @@
                     Text="MAME Utility" 
                     HorizontalAlignment="Center"/>
                 <TextBlock 
+                    x:Name="VersionTextBlock"
                     Margin="0,10,0,0" 
-                    Text="{Binding ApplicationVersion}" 
                     FontSize="14"
                     HorizontalAlignment="Center"/>
             </StackPanel>
@@ -53,8 +51,8 @@
             <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock HorizontalAlignment="Center">
                     <Hyperlink 
-                        Command="{Binding NavigateCommand}" 
-                        CommandParameter="https://www.purelogiccode.com">
+                        NavigateUri="https://www.purelogiccode.com"
+                        RequestNavigate="Hyperlink_RequestNavigate">
                         https://www.purelogiccode.com
                     </Hyperlink>
                 </TextBlock>
@@ -67,7 +65,7 @@
                 Height="35"
                 Margin="0,15,0,0"
                 HorizontalAlignment="Center"
-                Command="{Binding CloseCommand}"
+                Click="CloseButton_Click"
                 Content="Close"
                 Style="{StaticResource DefaultButtonStyle}" />
         </Grid>

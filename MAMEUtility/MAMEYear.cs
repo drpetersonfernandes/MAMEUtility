@@ -1,6 +1,7 @@
-﻿using System.IO;
+﻿using System.Collections.Concurrent;
+using System.IO;
 using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces; // Added
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
@@ -12,83 +13,113 @@ public static class MameYear
 
         try
         {
-            // Extract unique years and cache the result
-            var years = inputDoc.Descendants("machine")
-                .Select(static m => (string?)m.Element("year"))
-                .Distinct()
-                .Where(static y => !string.IsNullOrEmpty(y))
-                .ToList();
+            progress.Report(5);
+
+            logService.Log("Extracting years from XML...");
+            var years = await Task.Run(() =>
+                inputDoc.Descendants("machine")
+                    .Select(static m => (string?)m.Element("year"))
+                    .Distinct()
+                    .Where(static y => !string.IsNullOrEmpty(y))
+                    .ToList()
+            );
+
+            progress.Report(10);
 
             var totalYears = years.Count;
-            var yearsProcessed = 0;
-
-            // Define logging and progress intervals
-            const int logInterval = 5; // Log every 5 years
-            const int progressInterval = 2; // Update progress every 2 years
-
             logService.Log($"Found {totalYears} unique years to process.");
 
-            // Use parallel processing with throttling
-            var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) };
+            // Thread-safe collection for parallel processing
+            var yearDocs = new ConcurrentDictionary<string, XDocument>(StringComparer.OrdinalIgnoreCase);
+            var processedCount = 0;
 
-            await Parallel.ForEachAsync(years, options, async (year, token) =>
+            var logInterval = Math.Max(1, totalYears / 10);
+
+            // Parallel processing of years
+            logService.Log("Processing years in parallel...");
+
+            await Task.Run(() =>
             {
-                if (year == null) return;
+                Parallel.ForEach(years, new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                }, year =>
+                {
+                    if (year == null) return;
 
-                // Filter machines based on year - do this within the parallel operation
-                var machinesForYear = inputDoc.Descendants("machine")
-                    .Where(m => (string?)m.Element("year") == year)
-                    .ToList(); // Cache the result to avoid repeated queries
+                    try
+                    {
+                        var machinesForYear = inputDoc.Descendants("machine")
+                            .Where(m => (string?)m.Element("year") == year)
+                            .ToList();
 
-                // Create the XML document for the year
-                XDocument yearDoc = new(
-                    new XElement("Machines",
-                        from machine in machinesForYear
-                        select new XElement("Machine",
-                            new XElement("MachineName", machine.Attribute("name")?.Value ?? ""),
-                            new XElement("Description", machine.Element("description")?.Value ?? "")
-                        )
-                    )
-                );
+                        XDocument yearDoc = new(
+                            new XElement("Machines",
+                                from machine in machinesForYear
+                                select new XElement("Machine",
+                                    new XElement("MachineName", machine.Attribute("name")?.Value ?? ""),
+                                    new XElement("Description", machine.Element("description")?.Value ?? "")
+                                )
+                            )
+                        );
 
-                // Save the XML document for the year
-                var outputFilePath = Path.Combine(outputFolderMameYear, $"{year.Replace("?", "X")}.xml");
+                        // Use a safe key (replace '?' with 'X')
+                        var safeYear = year.Replace("?", "X");
+                        yearDocs[safeYear] = yearDoc;
+
+                        var currentCount = Interlocked.Increment(ref processedCount);
+
+                        if (currentCount % logInterval != 0 && currentCount != totalYears) return;
+
+                        logService.Log($"Processing progress: {currentCount}/{totalYears} years");
+                        var progressPercentage = 10 + (int)((double)currentCount / totalYears * 70);
+                        progress.Report(progressPercentage);
+                    }
+                    catch (Exception ex)
+                    {
+                        logService.LogError($"Failed to process year '{year}': {ex.Message}");
+                        _ = logService.LogExceptionAsync(ex, $"Error processing year '{year}'");
+                    }
+                });
+            });
+
+            progress.Report(80);
+
+            // Save all collected documents to disk
+            logService.Log("Saving year XML files...");
+            var savedCount = 0;
+            var totalToSave = yearDocs.Count;
+
+            foreach (var kvp in yearDocs)
+            {
+                var safeYear = kvp.Key;
+                var yearDoc = kvp.Value;
+                var outputFilePath = Path.Combine(outputFolderMameYear, $"{safeYear}.xml");
+
                 try
                 {
-                    await Task.Run(() => yearDoc.Save(outputFilePath), token);
+                    await Task.Run(() => yearDoc.Save(outputFilePath));
                 }
                 catch (Exception ex)
                 {
-                    logService.LogError($"Failed to save year file {outputFilePath}: {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Error saving year file {outputFilePath}");
-
-                    return;
+                    logService.LogError($"Failed to save file for year '{safeYear}': {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"Error saving year document for '{safeYear}'");
                 }
 
-                // Thread-safe incrementing
-                var processed = Interlocked.Increment(ref yearsProcessed);
+                savedCount++;
+                if (savedCount % 10 != 0 && savedCount != totalToSave) continue;
 
-                // Log only at intervals
-                if (processed % logInterval == 0 || processed == totalYears)
-                {
-                    logService.Log($"Progress: {processed}/{totalYears} years processed.");
-                }
+                var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
+                progress.Report(saveProgress);
+            }
 
-                // Update progress
-                if (processed % progressInterval == 0 || processed == totalYears)
-                {
-                    var progressPercentage = (double)processed / totalYears * 100;
-                    progress.Report((int)progressPercentage);
-                }
-            });
-
+            progress.Report(100);
             logService.Log("All year files created successfully.");
         }
         catch (Exception ex)
         {
             logService.LogError("An error occurred: " + ex.Message);
             await logService.LogExceptionAsync(ex, "Error in method MAMEYear.CreateAndSaveMameYearAsync");
-
             throw;
         }
     }

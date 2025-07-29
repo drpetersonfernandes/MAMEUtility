@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Concurrent;
+using System.IO;
 using System.Xml.Linq;
 using MAMEUtility.Services.Interfaces;
 
@@ -12,82 +13,120 @@ public static class MameSourcefile
 
         try
         {
-            // Extract unique source files and cache the result
-            var sourceFiles = inputDoc.Descendants("machine")
-                .Select(static m => (string?)m.Attribute("sourcefile"))
-                .Distinct()
-                .Where(static s => !string.IsNullOrEmpty(s))
-                .ToList();
+            progress.Report(5);
+
+            logService.Log("Extracting source files from XML...");
+            var sourceFiles = await Task.Run(() =>
+                inputDoc.Descendants("machine")
+                    .Select(static m => (string?)m.Attribute("sourcefile"))
+                    .Distinct()
+                    .Where(static s => !string.IsNullOrEmpty(s))
+                    .ToList()
+            );
+
+            progress.Report(10);
 
             var totalSourceFiles = sourceFiles.Count;
-            var sourceFilesProcessed = 0;
-
-            // Define logging and progress intervals
-            const int logInterval = 10; // Log every 10 sourcefiles
-            const int progressInterval = 5; // Update progress every 5 sourcefiles
-
             logService.Log($"Found {totalSourceFiles} unique source files to process.");
 
-            // Use parallel processing with throttling
-            var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) };
+            // Thread-safe collections for parallel processing
+            var sourcefileDocs = new ConcurrentDictionary<string, XDocument>(StringComparer.OrdinalIgnoreCase);
+            var generatedFileNames = new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            var processedCount = 0;
 
-            await Parallel.ForEachAsync(sourceFiles, options, async (sourceFile, token) =>
+            var logInterval = Math.Max(1, totalSourceFiles / 10);
+
+            // Parallel processing of source files
+            logService.Log("Processing source files in parallel...");
+
+            await Task.Run(() =>
             {
-                if (string.IsNullOrWhiteSpace(sourceFile)) return;
+                Parallel.ForEach(sourceFiles, new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                }, sourceFile =>
+                {
+                    if (string.IsNullOrWhiteSpace(sourceFile)) return;
 
-                // Remove the ".cpp" extension and clean filename in one pass
-                var safeSourceFileName = ReplaceInvalidFileNameChars(Path.GetFileNameWithoutExtension(sourceFile));
-                var outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{safeSourceFileName}.xml");
+                    try
+                    {
+                        var safeSourceFileName = ReplaceInvalidFileNameChars(Path.GetFileNameWithoutExtension(sourceFile));
 
-                // Filter and create document
-                XDocument filteredDoc = new(
-                    new XElement("Machines",
-                        from machine in inputDoc.Descendants("machine")
-                        where (string?)machine.Attribute("sourcefile") == sourceFile
-                        select new XElement("Machine",
-                            new XElement("MachineName", machine.Attribute("name")?.Value),
-                            new XElement("Description", machine.Element("description")?.Value)
-                        )
-                    )
-                );
+                        var uniqueSafeName = safeSourceFileName;
+                        var counter = 1;
+                        while (!generatedFileNames.TryAdd(uniqueSafeName, true))
+                        {
+                            uniqueSafeName = $"{safeSourceFileName}_{counter++}";
+                        }
 
-                // Save document
+                        // Create the filtered document
+                        XDocument filteredDoc = new(
+                            new XElement("Machines",
+                                from machine in inputDoc.Descendants("machine")
+                                where (string?)machine.Attribute("sourcefile") == sourceFile
+                                select new XElement("Machine",
+                                    new XElement("MachineName", machine.Attribute("name")?.Value),
+                                    new XElement("Description", machine.Element("description")?.Value)
+                                )
+                            )
+                        );
+
+                        sourcefileDocs[uniqueSafeName] = filteredDoc;
+
+                        var currentCount = Interlocked.Increment(ref processedCount);
+
+                        if (currentCount % logInterval != 0 && currentCount != totalSourceFiles) return;
+
+                        logService.Log($"Processing progress: {currentCount}/{totalSourceFiles} source files");
+                        var progressPercentage = 10 + (int)((double)currentCount / totalSourceFiles * 70);
+                        progress.Report(progressPercentage);
+                    }
+                    catch (Exception ex)
+                    {
+                        logService.LogError($"Failed to process sourcefile '{sourceFile}': {ex.Message}");
+                        _ = logService.LogExceptionAsync(ex, $"Error processing sourcefile '{sourceFile}'");
+                    }
+                });
+            });
+
+            progress.Report(80);
+
+            // Save all collected documents to disk
+            logService.Log("Saving sourcefile XML files...");
+            var savedCount = 0;
+            var totalToSave = sourcefileDocs.Count;
+
+            foreach (var kvp in sourcefileDocs)
+            {
+                var uniqueSafeName = kvp.Key;
+                var filteredDoc = kvp.Value;
+                var outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{uniqueSafeName}.xml");
+
                 try
                 {
-                    await Task.Run(() => filteredDoc.Save(outputFilePath), token);
+                    await Task.Run(() => filteredDoc.Save(outputFilePath));
                 }
                 catch (Exception ex)
                 {
-                    logService.LogError($"Failed to create file for {sourceFile}. Error: {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Error saving sourcefile document for {sourceFile}");
-
-                    return;
+                    logService.LogError($"Failed to save file for sourcefile '{uniqueSafeName}': {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"Error saving sourcefile document for '{uniqueSafeName}'");
                 }
 
+                savedCount++;
+                if (savedCount % 10 != 0 && savedCount != totalToSave) continue;
 
-                // Thread-safe incrementing
-                var processed = Interlocked.Increment(ref sourceFilesProcessed);
+                var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
+                progress.Report(saveProgress);
+            }
 
-                // Log only at intervals
-                if (processed % logInterval == 0 || processed == totalSourceFiles)
-                {
-                    logService.Log($"Progress: {processed}/{totalSourceFiles} source files processed.");
-                }
-
-                // Update progress
-                if (processed % progressInterval == 0 || processed == totalSourceFiles)
-                {
-                    var progressPercentage = (double)processed / totalSourceFiles * 100;
-                    progress.Report((int)progressPercentage);
-                }
-            });
-
+            progress.Report(100);
             logService.Log("All source file documents created successfully.");
         }
         catch (Exception ex)
         {
             logService.LogError("An error occurred: " + ex.Message);
             await logService.LogExceptionAsync(ex, "Error in method MAMESourcefile.CreateAndSaveMameSourcefileAsync");
+            throw;
         }
     }
 

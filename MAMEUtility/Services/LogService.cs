@@ -25,16 +25,13 @@ public class LogService : ILogService, IDisposable
         _bugReportService = bugReportService;
         _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MAMEUtilityLog.txt");
 
-        // Get the UI thread dispatcher - Ensure Application.Current is not null
         if (Application.Current == null)
         {
-            // This might happen in rare scenarios like unit testing or if called too early
             throw new InvalidOperationException("Application.Current is null. LogService cannot be initialized without a running WPF application.");
         }
 
         _dispatcher = Application.Current.Dispatcher;
 
-        // Create log directory if it doesn't exist
         try
         {
             var logDirectory = Path.GetDirectoryName(_logFilePath);
@@ -51,15 +48,12 @@ public class LogService : ILogService, IDisposable
 
     public void ShowLogWindow()
     {
-        // Ensure the operation runs on the UI thread
         if (!_dispatcher.CheckAccess())
         {
-            // If not on the UI thread, invoke the internal method
             _dispatcher.Invoke(ShowLogWindowInternal);
         }
         else
         {
-            // Already on the UI thread, call the internal method directly
             ShowLogWindowInternal();
         }
     }
@@ -68,30 +62,25 @@ public class LogService : ILogService, IDisposable
     {
         try
         {
-            // Check if the window already exists and is loaded/visible
             if (_logWindow is { IsLoaded: true, IsVisible: true })
             {
-                _logWindow.Activate(); // Bring the existing window to the front
+                _logWindow.Activate();
                 return;
             }
 
-            // If the window exists but was closed (IsLoaded becomes false), clear the reference
             if (_logWindow is { IsLoaded: false })
             {
                 _logWindow = null;
             }
 
-            // If the window doesn't exist or was closed, create a new instance
             if (_logWindow == null)
             {
                 _logWindow = new LogWindow();
-                // Handle the Closed event to nullify the reference
-                // This prevents issues if the user closes the window and tries to reopen it
                 _logWindow.Closed += (sender, args) => { _logWindow = null; };
             }
 
             _logWindow.Show();
-            _logWindow.Activate(); // Ensure it gets focus
+            _logWindow.Activate();
         }
         catch (Exception ex)
         {
@@ -110,8 +99,6 @@ public class LogService : ILogService, IDisposable
 
             var formattedMessage = FormatLogMessage(message, LogLevel.Info);
             _ = LogToFileAsync(formattedMessage);
-
-            // Raise event on UI thread - ViewModel will handle updating the window
             _dispatcher.BeginInvoke(() => LogMessageAdded?.Invoke(this, formattedMessage.TrimEnd(Environment.NewLine.ToCharArray())));
         }
         catch (Exception ex)
@@ -128,14 +115,12 @@ public class LogService : ILogService, IDisposable
             if (string.IsNullOrWhiteSpace(message)) return;
 
             var formattedMessage = FormatLogMessage(message, LogLevel.Error);
-            var userMessage = $"Error: {message}"; // Message for UI/event
-
+            var userMessage = $"Error: {message}";
             _ = LogToFileAsync(formattedMessage);
-
             _dispatcher.BeginInvoke(() =>
             {
-                LogMessageAdded?.Invoke(this, userMessage); // Use userMessage for the event
-                AskUserToOpenLogFile(); // Ask on UI thread
+                LogMessageAdded?.Invoke(this, userMessage);
+                AskUserToOpenLogFile();
             });
         }
         catch (Exception ex)
@@ -144,7 +129,6 @@ public class LogService : ILogService, IDisposable
         }
     }
 
-    // Internal version to avoid recursion if LogError fails
     private void LogErrorInternal(string message)
     {
         Debug.WriteLine(message);
@@ -159,7 +143,6 @@ public class LogService : ILogService, IDisposable
         }
     }
 
-
     public void LogWarning(string message)
     {
         try
@@ -167,15 +150,12 @@ public class LogService : ILogService, IDisposable
             if (string.IsNullOrWhiteSpace(message)) return;
 
             var formattedMessage = FormatLogMessage(message, LogLevel.Warning);
-            var userMessage = $"Warning: {message}"; // Message for UI/event
-
-            // REMOVED: AppendToLogWindow(formattedMessage); // This was causing the duplicate
+            var userMessage = $"Warning: {message}";
             _ = LogToFileAsync(formattedMessage);
-
             _dispatcher.BeginInvoke(() =>
             {
-                LogMessageAdded?.Invoke(this, userMessage); // Use userMessage for the event
-                AskUserToOpenLogFile(MessageBoxImage.Warning); // Ask on UI thread
+                LogMessageAdded?.Invoke(this, userMessage);
+                AskUserToOpenLogFile(MessageBoxImage.Warning);
             });
         }
         catch (Exception ex)
@@ -198,14 +178,12 @@ public class LogService : ILogService, IDisposable
             var errorMessage = FormatExceptionMessage(exception, additionalInfo);
             var userMessage = $"Error: {exception.GetType().Name} - {exception.Message}";
 
-            // REMOVED: AppendToLogWindow(errorMessage); // This was causing the duplicate
-            await LogToFileAsync(errorMessage); // Log full details to file
+            await LogToFileAsync(errorMessage);
             await _bugReportService.SendExceptionReportAsync(exception);
 
-            // Raise event and ask user on UI thread
             _ = _dispatcher.BeginInvoke(() =>
             {
-                LogMessageAdded?.Invoke(this, userMessage); // Use userMessage for the event
+                LogMessageAdded?.Invoke(this, userMessage);
                 AskUserToOpenLogFile();
             });
         }
@@ -246,7 +224,6 @@ public class LogService : ILogService, IDisposable
 
     private static string FormatLogMessage(string message, LogLevel level)
     {
-        // Add newline consistently for file logging
         return $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level,-7}] {message}{Environment.NewLine}";
     }
 
@@ -281,19 +258,15 @@ public class LogService : ILogService, IDisposable
         }
 
         sb.AppendLine("--- End Exception Details ---");
-        sb.AppendLine(); // Add a blank line for separation in the log file
-
+        sb.AppendLine();
         return sb.ToString();
     }
 
     private void AskUserToOpenLogFile(MessageBoxImage messageBoxImage = MessageBoxImage.Error)
     {
-        // This method already correctly uses BeginInvoke if needed.
         if (!_dispatcher.CheckAccess())
         {
-            Debug.WriteLine("Warning: AskUserToOpenLogFile called from non-UI thread directly.");
             _dispatcher.BeginInvoke(() => AskUserToOpenLogFileInternal(messageBoxImage));
-
             return;
         }
 
@@ -306,7 +279,6 @@ public class LogService : ILogService, IDisposable
         {
             var title = messageBoxImage == MessageBoxImage.Warning ? "Warning Occurred" : "Error Occurred";
             var message = $"A {(messageBoxImage == MessageBoxImage.Warning ? "warning" : "critical error")} has occurred and has been logged.\n\nWould you like to open the log file?\n({_logFilePath})";
-
             var result = MessageBox.Show(message, title, MessageBoxButton.YesNo, messageBoxImage);
 
             if (result != MessageBoxResult.Yes) return;
@@ -317,10 +289,7 @@ public class LogService : ILogService, IDisposable
                 return;
             }
 
-            var psi = new ProcessStartInfo(_logFilePath)
-            {
-                UseShellExecute = true // Necessary to open with default app
-            };
+            var psi = new ProcessStartInfo(_logFilePath) { UseShellExecute = true };
             Process.Start(psi);
         }
         catch (Exception ex)
@@ -353,7 +322,6 @@ public class LogService : ILogService, IDisposable
         if (disposing)
         {
             _logFileSemaphore?.Dispose();
-            // Ensure the log window is closed if the service is disposed
             _dispatcher?.Invoke(() => _logWindow?.Close());
         }
 

@@ -4,11 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:viewModels="clr-namespace:MAMEUtility.ViewModels"
     Title="MAME Utility"
     Width="600"
     Height="550"
-    d:DataContext="{d:DesignInstance Type=viewModels:MainViewModel}"
     ResizeMode="CanMinimize"
     WindowStartupLocation="CenterScreen"
     mc:Ignorable="d">
@@ -40,13 +38,13 @@
         <!-- Menu -->
         <Menu Grid.Row="0" Background="#F0F0F0">
             <MenuItem Header="_File">
-                <MenuItem Command="{Binding ShowLogCommand}" Header="View _Log" />
+                <MenuItem Header="View _Log" Click="ShowLog_Click" />
                 <Separator />
-                <MenuItem Command="{Binding ExitCommand}" Header="E_xit" />
+                <MenuItem Header="E_xit" Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Command="{Binding DonateCommand}" Header="_Donate" />
-                <MenuItem Command="{Binding AboutCommand}" Header="_About" />
+                <MenuItem Header="_Donate" Click="Donate_Click" />
+                <MenuItem Header="_About" Click="About_Click" />
             </MenuItem>
         </Menu>
 
@@ -79,24 +77,29 @@
                         HorizontalAlignment="Center"/>
                     
                     <Button
+                        x:Name="CreateMameFullButton"
                         Style="{StaticResource OperationButtonStyle}"
-                        Command="{Binding CreateMameFullCommand}"
+                        Click="CreateMameFull_Click"
                         Content="Create MAME Full List" />
                     <Button
+                        x:Name="CreateMameManufacturerButton"
                         Style="{StaticResource OperationButtonStyle}"
-                        Command="{Binding CreateMameManufacturerCommand}"
+                        Click="CreateMameManufacturer_Click"
                         Content="Create MAME Manufacturer List" />
                     <Button
+                        x:Name="CreateMameYearButton"
                         Style="{StaticResource OperationButtonStyle}"
-                        Command="{Binding CreateMameYearCommand}"
+                        Click="CreateMameYear_Click"
                         Content="Create MAME Year List" />
                     <Button
+                        x:Name="CreateMameSourcefileButton"
                         Style="{StaticResource OperationButtonStyle}"
-                        Command="{Binding CreateMameSourcefileCommand}"
+                        Click="CreateMameSourcefile_Click"
                         Content="Create MAME Sourcefile List" />
                     <Button
+                        x:Name="CreateMameSoftwareListButton"
                         Style="{StaticResource OperationButtonStyle}"
-                        Command="{Binding CreateMameSoftwareListCommand}"
+                        Click="CreateMameSoftwareList_Click"
                         Content="Create MAME Software List" />
                 </StackPanel>
             </Border>
@@ -119,22 +122,25 @@
                         HorizontalAlignment="Center"/>
                     
                     <Button
+                        x:Name="MergeListsButton"
                         Style="{StaticResource UtilityButtonStyle}"
-                        Command="{Binding MergeListsCommand}"
+                        Click="MergeLists_Click"
                         Content="Merge Lists" />
                     <Button
+                        x:Name="CopyRomsButton"
                         Style="{StaticResource UtilityButtonStyle}"
-                        Command="{Binding CopyRomsCommand}"
+                        Click="CopyRoms_Click"
                         Content="Copy ROMs" />
                     <Button
+                        x:Name="CopyImagesButton"
                         Style="{StaticResource UtilityButtonStyle}"
-                        Command="{Binding CopyImagesCommand}"
+                        Click="CopyImages_Click"
                         Content="Copy Images" />
                 </StackPanel>
             </Border>
         </Grid>
 
-        <!--  Progress bar  -->
+        <!-- Progress bar -->
         <Grid Grid.Row="3" Margin="15,10,15,15">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -148,9 +154,9 @@
                 FontWeight="SemiBold"/>
             
             <ProgressBar
+                x:Name="OverallProgressBar"
                 Grid.Row="1"
                 Height="25"
-                Value="{Binding OverallProgress}"
                 Background="#E0E0E0"
                 Foreground="#4CAF50">
                 <ProgressBar.Template>
@@ -179,16 +185,35 @@
             
             <!-- Processing overlay -->
             <Border 
+                x:Name="ProcessingOverlay"
                 Grid.Row="0" 
                 Grid.RowSpan="2"
                 Background="#80000000" 
-                Visibility="{Binding IsProcessing, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock 
-                    Text="Processing..." 
-                    Foreground="White" 
-                    FontWeight="Bold" 
+                Visibility="Collapsed">
+                <StackPanel 
+                    Orientation="Vertical" 
                     HorizontalAlignment="Center" 
-                    VerticalAlignment="Center"/>
+                    VerticalAlignment="Center">
+                    <TextBlock 
+                        x:Name="ProcessingTextBlock"
+                        Text="Processing..." 
+                        Foreground="White" 
+                        FontWeight="Bold" 
+                        FontSize="16"/>
+                    <TextBlock 
+                        x:Name="ElapsedTimeTextBlock"
+                        Text="Elapsed: 00:00" 
+                        Foreground="White" 
+                        FontWeight="Bold" 
+                        FontSize="14"
+                        Margin="0,10,0,0"/>
+                    <TextBlock 
+                        Text="Please wait while the operation completes..." 
+                        Foreground="White" 
+                        FontSize="12"
+                        Margin="0,5,0,0"
+                        Opacity="0.8"/>
+                </StackPanel>
             </Border>
         </Grid>
     </Grid>

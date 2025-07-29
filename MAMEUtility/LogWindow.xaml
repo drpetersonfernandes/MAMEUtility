@@ -4,11 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:viewModels="clr-namespace:MAMEUtility.ViewModels"
     Title="MAME Utility Log" 
     Height="450" 
     Width="600"
-    d:DataContext="{d:DesignInstance Type=viewModels:LogViewModel}"
     mc:Ignorable="d">
     
     <Grid Margin="10">
@@ -37,9 +35,8 @@
                 Orientation="Horizontal">
                 <Button 
                     Content="Clear Log" 
-                    Command="{Binding ClearCommand}" 
+                    Click="ClearButton_Click"
                     Style="{StaticResource DefaultButtonStyle}" />
-                
             </StackPanel>
         </Grid>
         
@@ -51,7 +48,6 @@
             CornerRadius="3">
             <TextBox 
                 Name="LogTextBox" 
-                Text="{Binding LogText, Mode=TwoWay}" 
                 IsReadOnly="True" 
                 VerticalScrollBarVisibility="Auto" 
                 HorizontalScrollBarVisibility="Auto" 

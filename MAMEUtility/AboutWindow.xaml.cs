@@ -1,15 +1,18 @@
-﻿using System.Reflection;
-using MAMEUtility.ViewModels;
+﻿using System.Diagnostics;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Navigation;
+using MAMEUtility.Services.Interfaces;
 
 namespace MAMEUtility;
 
-/// <inheritdoc cref="System.Windows.Window" />
 /// <summary>
 /// Interaction logic for AboutWindow.xaml
 /// </summary>
 public partial class AboutWindow
 {
-    /// <inheritdoc />
+    private readonly ILogService _logService;
+
     /// <summary>
     /// Constructor
     /// </summary>
@@ -17,14 +20,11 @@ public partial class AboutWindow
     {
         InitializeComponent();
 
-        // Get the view model
-        var viewModel = ServiceLocator.Instance.Resolve<AboutViewModel>();
+        // Get the log service
+        _logService = ServiceLocator.Instance.Resolve<ILogService>();
 
-        // Set the data context
-        DataContext = viewModel;
-
-        // Subscribe to close event
-        viewModel.CloseRequested += (_, _) => Close();
+        // Set the version text
+        VersionTextBlock.Text = ApplicationVersion;
     }
 
     /// <summary>
@@ -37,5 +37,28 @@ public partial class AboutWindow
             var version = Assembly.GetExecutingAssembly().GetName().Version;
             return "Version: " + (version?.ToString() ?? "Unknown");
         }
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = e.Uri.AbsoluteUri,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError($"Unable to open the link: {ex.Message}");
+        }
+
+        e.Handled = true;
     }
 }

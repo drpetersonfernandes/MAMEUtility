@@ -17,6 +17,8 @@ public static class MameSoftwareList
                 throw new DirectoryNotFoundException("The specified folder does not exist.");
             }
 
+            progress.Report(5);
+
             var files = Directory.GetFiles(inputFolderPath, "*.xml");
             if (files.Length == 0)
             {
@@ -26,70 +28,69 @@ public static class MameSoftwareList
 
             logService.Log($"Found {files.Length} XML files to process.");
 
-            // Define logging and progress intervals
-            const int logInterval = 5; // Log every 5 files
-            const int progressInterval = 2; // Update progress every 2 files
-
-            // Use concurrent collection for thread safety
-            var softwareList = new ConcurrentBag<XElement>();
+            // Thread-safe collection for parallel processing
+            var allSoftware = new ConcurrentBag<XElement>();
             var processedCount = 0;
+            var totalFiles = files.Length;
 
-            // Use parallel processing with throttling
-            var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) };
+            var logInterval = Math.Max(1, totalFiles / 10);
 
-            await Parallel.ForEachAsync(files, options, async (file, token) =>
+            // Parallel processing of XML files
+            logService.Log("Processing XML files in parallel...");
+
+            await Task.Run(() =>
             {
-                try
+                Parallel.ForEach(files, new ParallelOptions
                 {
-                    var doc = await Task.Run(() => XDocument.Load(file), token);
-
-                    var softwares = doc.Descendants("software")
-                        .Select(static software => new XElement("Software",
-                            new XElement("SoftwareName", software.Attribute("name")?.Value),
-                            new XElement("Description", software.Element("description")?.Value ?? "No Description")))
-                        .ToList(); // Cache the result
-
-                    // Add all softwares to the concurrent bag
-                    foreach (var software in softwares)
-                    {
-                        softwareList.Add(software);
-                    }
-
-                    // Thread-safe incrementing
-                    var processed = Interlocked.Increment(ref processedCount);
-
-                    // Log only at intervals
-                    if (processed % logInterval == 0 || processed == files.Length)
-                    {
-                        logService.Log($"Progress: {processed}/{files.Length} files processed.");
-                    }
-
-                    // Update progress less frequently
-                    if (processed % progressInterval == 0 || processed == files.Length)
-                    {
-                        var progressPercentage = (double)processed / files.Length * 100;
-                        progress?.Report((int)progressPercentage);
-                    }
-                }
-                catch (Exception ex)
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                }, file =>
                 {
-                    logService.LogWarning($"Skipping file '{file}' due to an error: {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Skipping file '{file}' due to an error: {ex.Message}");
-                }
+                    try
+                    {
+                        var doc = XDocument.Load(file);
+
+                        var softwares = doc.Descendants("software")
+                            .Select(static software => new XElement("Software",
+                                new XElement("SoftwareName", software.Attribute("name")?.Value),
+                                new XElement("Description", software.Element("description")?.Value ?? "No Description")))
+                            .ToList();
+
+                        foreach (var software in softwares)
+                        {
+                            allSoftware.Add(software);
+                        }
+
+                        var currentCount = Interlocked.Increment(ref processedCount);
+
+                        if (currentCount % logInterval != 0 && currentCount != totalFiles) return;
+
+                        logService.Log($"Processing progress: {currentCount}/{totalFiles} files processed");
+                        var progressPercentage = 10 + (int)((double)currentCount / totalFiles * 80);
+                        progress.Report(progressPercentage);
+                    }
+                    catch (Exception ex)
+                    {
+                        logService.LogWarning($"Skipping file '{file}' due to an error: {ex.Message}");
+                        _ = logService.LogExceptionAsync(ex, $"Skipping file '{file}' due to an error");
+                    }
+                });
             });
 
-            logService.Log("All files processed, saving consolidated XML file...");
+            progress.Report(90);
 
-            // Convert to list and save
-            var outputDoc = new XDocument(new XElement("Softwares", softwareList.ToList()));
+            // Create and save the consolidated XML
+            logService.Log("Creating consolidated XML file...");
+            var softwareList = allSoftware.ToList();
+            var outputDoc = new XDocument(new XElement("Softwares", softwareList));
+
             await Task.Run(() => outputDoc.Save(outputFilePath));
 
+            progress.Report(100);
             logService.Log($"Consolidated XML file saved with {softwareList.Count} software entries to: {outputFilePath}");
         }
         catch (Exception ex)
         {
             await logService.LogExceptionAsync(ex, "Error in method CreateAndSaveSoftwareListAsync");
-
             throw;
         }
     }
