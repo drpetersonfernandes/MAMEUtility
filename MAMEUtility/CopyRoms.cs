@@ -1,23 +1,29 @@
 ﻿using System.IO;
 using System.Xml.Linq;
 using MAMEUtility.Services.Interfaces;
+using System.Threading;
 
 namespace MAMEUtility;
 
 public static class CopyRoms
 {
-    public static async Task CopyRomsFromXmlAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress, ILogService logService)
+    public static async Task CopyRomsFromXmlAsync(
+        string[] xmlFilePaths,
+        string sourceDirectory,
+        string destinationDirectory,
+        IProgress<int> progress,
+        ILogService logService,
+        CancellationToken cancellationToken = default)
     {
         var totalFiles = xmlFilePaths.Length;
         var filesProcessed = 0;
-
-        // Define logging intervals
         const int logInterval = 5; // Log progress every 5 files
 
         logService.Log($"Starting ROM copy operation. Files to process: {totalFiles}");
         logService.Log($"Source directory: {sourceDirectory}");
         logService.Log($"Destination directory: {destinationDirectory}");
 
+        // Validate directories
         if (!Directory.Exists(sourceDirectory))
         {
             logService.LogError($"Source directory does not exist: {sourceDirectory}");
@@ -41,30 +47,37 @@ public static class CopyRoms
         // Process each XML file sequentially
         foreach (var xmlFilePath in xmlFilePaths)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
-                var processed = filesProcessed;
                 var fileProgress = new Progress<int>(percent =>
                 {
                     // Calculate weighted progress
-                    var weightedPercentage = (double)processed / totalFiles * 100 + (double)percent / totalFiles;
+                    var weightedPercentage = (double)filesProcessed / totalFiles * 100 + (double)percent / totalFiles;
                     progress.Report((int)weightedPercentage);
                 });
 
-                await ProcessXmlFileAsync(xmlFilePath, sourceDirectory, destinationDirectory, fileProgress, logService);
+                await ProcessXmlFileAsync(
+                    xmlFilePath, 
+                    sourceDirectory, 
+                    destinationDirectory, 
+                    fileProgress, 
+                    logService,
+                    cancellationToken
+                );
 
                 filesProcessed++;
 
-                // Log overall progress
+                // Batch logging
                 if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
                 {
                     logService.Log($"Overall Progress: {filesProcessed}/{totalFiles} XML files processed.");
                 }
 
-                // Report progress based on completed files
                 progress.Report((int)((double)filesProcessed / totalFiles * 100));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
                 await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
@@ -74,17 +87,23 @@ public static class CopyRoms
         logService.Log($"ROM copy operation completed. Processed {filesProcessed} of {totalFiles} files.");
     }
 
-    private static async Task ProcessXmlFileAsync(string xmlFilePath, string sourceDirectory, string destinationDirectory, IProgress<int> progress, ILogService logService)
+    private static async Task ProcessXmlFileAsync(
+        string xmlFilePath,
+        string sourceDirectory,
+        string destinationDirectory,
+        IProgress<int> progress,
+        ILogService logService,
+        CancellationToken cancellationToken)
     {
         XDocument xmlDoc;
         var fileName = Path.GetFileName(xmlFilePath);
 
         try
         {
-            xmlDoc = await Task.Run(() => XDocument.Load(xmlFilePath));
+            xmlDoc = await Task.Run(() => XDocument.Load(xmlFilePath), cancellationToken);
             logService.Log($"Successfully loaded XML file: {fileName}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             await logService.LogExceptionAsync(ex, $"Failed to load XML file: {xmlFilePath}");
             logService.LogError($"Failed to load XML file: {fileName}. Skipping this file.");
@@ -118,19 +137,40 @@ public static class CopyRoms
 
         foreach (var machineName in machineNames)
         {
-            CopyRom(sourceDirectory, destinationDirectory, machineName, logService);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                // Throughput optimization
+                if (romsProcessed % 10 == 0)
+                {
+                    await Task.Delay(1, cancellationToken); // Yield to thread pool
+                }
+
+                await Task.Run(() => 
+                    CopyRom(sourceDirectory, destinationDirectory, machineName, logService),
+                    cancellationToken
+                );
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logService.LogError($"Error copying ROM for {machineName}: {ex.Message}");
+                await logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}");
+            }
 
             romsProcessed++;
 
+            // Batch logging
+            if (romsProcessed % internalLogInterval == 0 || romsProcessed == totalRoms)
+            {
+                logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
+            }
+
+            // Progress reporting
             if (romsProcessed % internalProgressInterval == 0 || romsProcessed == totalRoms)
             {
                 var progressPercentage = (double)romsProcessed / totalRoms * 100;
                 progress.Report((int)progressPercentage);
-            }
-
-            if (romsProcessed % internalLogInterval == 0 || romsProcessed == totalRoms)
-            {
-                logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
             }
         }
 
@@ -153,7 +193,7 @@ public static class CopyRoms
 
             if (File.Exists(sourceFile))
             {
-                File.Copy(sourceFile, destinationFile, true);
+                File.Copy(sourceFile, destinationFile, true); // Overwrite existing files
             }
             else
             {

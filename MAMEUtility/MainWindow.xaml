@@ -213,6 +213,19 @@
                         FontSize="12"
                         Margin="0,5,0,0"
                         Opacity="0.8"/>
+        
+                    <!-- Add Cancel Button -->
+                    <Button 
+                        x:Name="CancelProcessingButton"
+                        Content="Cancel Operation"
+                        Width="150"
+                        Height="35"
+                        Margin="0,20,0,0"
+                        Background="#E74C3C"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Click="CancelProcessingButton_Click"
+                        Style="{StaticResource DefaultButtonStyle}"/>
                 </StackPanel>
             </Border>
         </Grid>

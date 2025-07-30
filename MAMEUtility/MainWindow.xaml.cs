@@ -17,6 +17,8 @@ public partial class MainWindow
     private readonly Stopwatch _processingStopwatch;
     private readonly DispatcherTimer _progressUpdateTimer;
 
+    private CancellationTokenSource? _cancellationTokenSource;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -84,6 +86,8 @@ public partial class MainWindow
 
         if (isProcessing)
         {
+            _cancellationTokenSource = new CancellationTokenSource();
+
             _processingStopwatch.Reset();
             _processingStopwatch.Start();
             _processingTimer.Start();
@@ -93,6 +97,9 @@ public partial class MainWindow
         }
         else
         {
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+
             _processingStopwatch.Stop();
             _processingTimer.Stop();
             _progressUpdateTimer.Stop();
@@ -104,6 +111,8 @@ public partial class MainWindow
         try
         {
             SetProcessingState(true, "MAME Full List");
+
+            var token = _cancellationTokenSource!.Token;
 
             _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             var inputFilePaths = _dialogService.ShowOpenFileDialog(
@@ -135,8 +144,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress);
+            await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress, token);
             _logService.Log("Output file saved.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -515,5 +528,18 @@ public partial class MainWindow
     private void Exit_Click(object sender, RoutedEventArgs e)
     {
         Application.Current.Shutdown();
+    }
+
+    private void CancelProcessingButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _cancellationTokenSource?.Cancel();
+            _logService.Log("Operation cancellation requested by user");
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError($"Failed to cancel operation: {ex.Message}");
+        }
     }
 }

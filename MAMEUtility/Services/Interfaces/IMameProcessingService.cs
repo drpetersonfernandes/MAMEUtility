@@ -2,7 +2,7 @@
 
 public interface IMameProcessingService
 {
-    Task CreateMameFullListAsync(string inputFilePath, string outputFilePath, IProgress<int> progress);
+    Task CreateMameFullListAsync(string inputFilePath, string outputFilePath, IProgress<int> progress, CancellationToken cancellationToken = default);
 
     Task CreateMameManufacturerListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress);
 

@@ -8,18 +8,22 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
 {
     private readonly ILogService _logService = logService;
 
-    public async Task CreateMameFullListAsync(string inputFilePath, string outputFilePath, IProgress<int> progress)
+    public async Task CreateMameFullListAsync(
+        string inputFilePath, 
+        string outputFilePath, 
+        IProgress<int> progress,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath));
+            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
 
             // Create a background worker for compatibility with MameFull
             var worker = new BackgroundWorker { WorkerReportsProgress = true };
             worker.ProgressChanged += (_, e) => progress.Report(e.ProgressPercentage);
 
             // Pass _logService directly
-            await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePath, worker, _logService);
+            await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePath, worker, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
