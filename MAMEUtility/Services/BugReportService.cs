@@ -2,7 +2,7 @@
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility.Services;
 

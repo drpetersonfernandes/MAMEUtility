@@ -1,13 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using System.IO;
 using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameYear
 {
-    public static async Task CreateAndSaveMameYearAsync(XDocument inputDoc, string outputFolderMameYear, IProgress<int> progress, ILogService logService)
+    public static async Task CreateAndSaveMameYearAsync(XDocument inputDoc, string outputFolderMameYear, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
     {
         logService.Log($"Output folder for MAME Year: {outputFolderMameYear}");
 
@@ -21,8 +21,7 @@ public static class MameYear
                     .Select(static m => (string?)m.Element("year"))
                     .Distinct()
                     .Where(static y => !string.IsNullOrEmpty(y))
-                    .ToList()
-            );
+                    .ToList(), cancellationToken);
 
             progress.Report(10);
 
@@ -42,10 +41,13 @@ public static class MameYear
             {
                 Parallel.ForEach(years, new ParallelOptions
                 {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                    MaxDegreeOfParallelism = Environment.ProcessorCount,
+                    CancellationToken = cancellationToken
                 }, year =>
                 {
                     if (year == null) return;
+
+                    cancellationToken.ThrowIfCancellationRequested();
 
                     try
                     {
@@ -81,7 +83,7 @@ public static class MameYear
                         _ = logService.LogExceptionAsync(ex, $"Error processing year '{year}'");
                     }
                 });
-            });
+            }, cancellationToken);
 
             progress.Report(80);
 
@@ -92,13 +94,15 @@ public static class MameYear
 
             foreach (var kvp in yearDocs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var safeYear = kvp.Key;
                 var yearDoc = kvp.Value;
                 var outputFilePath = Path.Combine(outputFolderMameYear, $"{safeYear}.xml");
 
                 try
                 {
-                    await Task.Run(() => yearDoc.Save(outputFilePath));
+                    await Task.Run(() => yearDoc.Save(outputFilePath), cancellationToken);
                 }
                 catch (Exception ex)
                 {

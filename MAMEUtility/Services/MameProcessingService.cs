@@ -1,6 +1,5 @@
-﻿using System.ComponentModel;
-using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
+﻿using System.Xml.Linq;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility.Services;
 
@@ -9,21 +8,15 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
     private readonly ILogService _logService = logService;
 
     public async Task CreateMameFullListAsync(
-        string inputFilePath, 
-        string outputFilePath, 
+        string inputFilePath,
+        string outputFilePath,
         IProgress<int> progress,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
-
-            // Create a background worker for compatibility with MameFull
-            var worker = new BackgroundWorker { WorkerReportsProgress = true };
-            worker.ProgressChanged += (_, e) => progress.Report(e.ProgressPercentage);
-
-            // Pass _logService directly
-            await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePath, worker, _logService, cancellationToken);
+            await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -32,17 +25,12 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task CreateMameManufacturerListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress)
+    public async Task CreateMameManufacturerListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath));
-
-            await MameManufacturer.CreateAndSaveMameManufacturerAsync(
-                inputDoc,
-                outputFolderPath,
-                progress,
-                _logService);
+            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
+            await MameManufacturer.CreateAndSaveMameManufacturerAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -51,18 +39,12 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task CreateMameYearListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress)
+    public async Task CreateMameYearListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath));
-
-            // Pass _logService directly
-            await MameYear.CreateAndSaveMameYearAsync(
-                inputDoc,
-                outputFolderPath,
-                progress,
-                _logService);
+            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
+            await MameYear.CreateAndSaveMameYearAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -71,17 +53,12 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task CreateMameSourcefileListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress)
+    public async Task CreateMameSourcefileListsAsync(string inputFilePath, string outputFolderPath, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath));
-
-            await MameSourcefile.CreateAndSaveMameSourcefileAsync(
-                inputDoc,
-                outputFolderPath,
-                progress,
-                _logService);
+            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
+            await MameSourcefile.CreateAndSaveMameSourcefileAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -90,16 +67,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task CreateMameSoftwareListAsync(string inputFolderPath, string outputFilePath, IProgress<int> progress)
+    public async Task CreateMameSoftwareListAsync(string inputFolderPath, string outputFilePath, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            // Pass _logService directly
-            await MameSoftwareList.CreateAndSaveSoftwareListAsync(
-                inputFolderPath,
-                outputFilePath,
-                progress,
-                _logService);
+            await MameSoftwareList.CreateAndSaveSoftwareListAsync(inputFolderPath, outputFilePath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -108,15 +80,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task MergeListsAsync(string[] inputFilePaths, string xmlOutputPath, string datOutputPath)
+    public async Task MergeListsAsync(string[] inputFilePaths, string xmlOutputPath, string datOutputPath, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            await MergeList.MergeAndSaveBothAsync(
-                inputFilePaths,
-                xmlOutputPath,
-                datOutputPath,
-                _logService);
+            await MergeList.MergeAndSaveBothAsync(inputFilePaths, xmlOutputPath, datOutputPath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -125,16 +93,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task CopyRomsAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
+    public async Task CopyRomsAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            await CopyRoms.CopyRomsFromXmlAsync(
-                xmlFilePaths,
-                sourceDirectory,
-                destinationDirectory,
-                progress,
-                _logService);
+            await CopyRoms.CopyRomsFromXmlAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -143,16 +106,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         }
     }
 
-    public async Task CopyImagesAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress)
+    public async Task CopyImagesAsync(string[] xmlFilePaths, string sourceDirectory, string destinationDirectory, IProgress<int> progress, CancellationToken cancellationToken = default)
     {
         try
         {
-            await CopyImages.CopyImagesFromXmlAsync(
-                xmlFilePaths,
-                sourceDirectory,
-                destinationDirectory,
-                progress,
-                _logService);
+            await CopyImages.CopyImagesFromXmlAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {

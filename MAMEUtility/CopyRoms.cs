@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
-using System.Threading;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
@@ -44,30 +43,33 @@ public static class CopyRoms
             }
         }
 
-        // Process each XML file sequentially
+         // Process each XML file sequentially
         foreach (var xmlFilePath in xmlFilePaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
+                var currentFileIndex = filesProcessed; // Capture current index before processing
                 var fileProgress = new Progress<int>(percent =>
                 {
-                    // Calculate weighted progress
-                    var weightedPercentage = (double)filesProcessed / totalFiles * 100 + (double)percent / totalFiles;
+                    // Clamp percent between 0-100 to prevent inflated progress
+                    var clampedPercent = Math.Max(0, Math.Min(100, percent));
+                    // Calculate weighted progress: (completed files + current file's percentage) / total files * 100
+                    var weightedPercentage = (currentFileIndex + clampedPercent / 100.0) / totalFiles * 100.0;
                     progress.Report((int)weightedPercentage);
                 });
 
                 await ProcessXmlFileAsync(
-                    xmlFilePath, 
-                    sourceDirectory, 
-                    destinationDirectory, 
-                    fileProgress, 
+                    xmlFilePath,
+                    sourceDirectory,
+                    destinationDirectory,
+                    fileProgress,
                     logService,
                     cancellationToken
                 );
 
-                filesProcessed++;
+                filesProcessed++; // Increment only after the file is fully processed
 
                 // Batch logging
                 if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
@@ -75,12 +77,17 @@ public static class CopyRoms
                     logService.Log($"Overall Progress: {filesProcessed}/{totalFiles} XML files processed.");
                 }
 
+                // Report final progress for this file
                 progress.Report((int)((double)filesProcessed / totalFiles * 100));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
                 await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
+                // Even if an error occurs, we still count it as "processed" for overall progress calculation
+                // to ensure the progress bar eventually reaches 100% for the total number of files attempted.
+                filesProcessed++;
+                progress.Report((int)((double)filesProcessed / totalFiles * 100));
             }
         }
 
@@ -141,15 +148,8 @@ public static class CopyRoms
 
             try
             {
-                // Throughput optimization
-                if (romsProcessed % 10 == 0)
-                {
-                    await Task.Delay(1, cancellationToken); // Yield to thread pool
-                }
-
-                await Task.Run(() => 
-                    CopyRom(sourceDirectory, destinationDirectory, machineName, logService),
-                    cancellationToken
+                await Task.Run(() =>
+                        CopyRom(sourceDirectory, destinationDirectory, machineName, logService), cancellationToken
                 );
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -166,7 +166,7 @@ public static class CopyRoms
                 logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
             }
 
-            // Progress reporting
+            // Progress reporting - only report at intervals to avoid excessive updates
             if (romsProcessed % internalProgressInterval == 0 || romsProcessed == totalRoms)
             {
                 var progressPercentage = (double)romsProcessed / totalRoms * 100;
@@ -175,6 +175,7 @@ public static class CopyRoms
         }
 
         logService.Log($"Completed processing {romsProcessed} ROMs from {fileName}");
+        // Final progress report for this file
         progress.Report(100);
     }
 

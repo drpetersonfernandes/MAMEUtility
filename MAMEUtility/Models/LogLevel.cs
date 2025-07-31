@@ -1,4 +1,4 @@
-namespace MAMEUtility;
+namespace MAMEUtility.Models;
 
 public enum LogLevel
 {

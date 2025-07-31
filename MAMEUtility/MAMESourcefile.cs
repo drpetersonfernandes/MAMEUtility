@@ -1,13 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using System.IO;
 using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameSourcefile
 {
-    public static async Task CreateAndSaveMameSourcefileAsync(XDocument inputDoc, string outputFolderMameSourcefile, IProgress<int> progress, ILogService logService)
+    public static async Task CreateAndSaveMameSourcefileAsync(XDocument inputDoc, string outputFolderMameSourcefile, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
     {
         logService.Log($"Output folder for MAME Sourcefile: {outputFolderMameSourcefile}");
 
@@ -21,8 +21,7 @@ public static class MameSourcefile
                     .Select(static m => (string?)m.Attribute("sourcefile"))
                     .Distinct()
                     .Where(static s => !string.IsNullOrEmpty(s))
-                    .ToList()
-            );
+                    .ToList(), cancellationToken);
 
             progress.Report(10);
 
@@ -43,14 +42,18 @@ public static class MameSourcefile
             {
                 Parallel.ForEach(sourceFiles, new ParallelOptions
                 {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                    MaxDegreeOfParallelism = Environment.ProcessorCount,
+                    CancellationToken = cancellationToken
                 }, sourceFile =>
                 {
                     if (string.IsNullOrWhiteSpace(sourceFile)) return;
 
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     try
                     {
-                        var safeSourceFileName = ReplaceInvalidFileNameChars(Path.GetFileNameWithoutExtension(sourceFile));
+                        // Use the new FileNameHelper for robust sanitization of the actual filename
+                        var safeSourceFileName = FileNameHelper.SanitizeForFileName(Path.GetFileNameWithoutExtension(sourceFile));
 
                         var uniqueSafeName = safeSourceFileName;
                         var counter = 1;
@@ -65,8 +68,8 @@ public static class MameSourcefile
                                 from machine in inputDoc.Descendants("machine")
                                 where (string?)machine.Attribute("sourcefile") == sourceFile
                                 select new XElement("Machine",
-                                    new XElement("MachineName", machine.Attribute("name")?.Value),
-                                    new XElement("Description", machine.Element("description")?.Value)
+                                    new XElement("MachineName", FileNameHelper.SanitizeForFileName(machine.Attribute("name")?.Value ?? "", "")), // Sanitize for name, not file
+                                    new XElement("Description", FileNameHelper.SanitizeForXmlValue(machine.Element("description")?.Value ?? ""))
                                 )
                             )
                         );
@@ -75,11 +78,12 @@ public static class MameSourcefile
 
                         var currentCount = Interlocked.Increment(ref processedCount);
 
-                        if (currentCount % logInterval != 0 && currentCount != totalSourceFiles) return;
-
-                        logService.Log($"Processing progress: {currentCount}/{totalSourceFiles} source files");
-                        var progressPercentage = 10 + (int)((double)currentCount / totalSourceFiles * 70);
-                        progress.Report(progressPercentage);
+                        if (currentCount % logInterval == 0 || currentCount == totalSourceFiles)
+                        {
+                            logService.Log($"Processing progress: {currentCount}/{totalSourceFiles} source files");
+                            var progressPercentage = 10 + (int)((double)currentCount / totalSourceFiles * 70);
+                            progress.Report(progressPercentage);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -87,7 +91,7 @@ public static class MameSourcefile
                         _ = logService.LogExceptionAsync(ex, $"Error processing sourcefile '{sourceFile}'");
                     }
                 });
-            });
+            }, cancellationToken);
 
             progress.Report(80);
 
@@ -98,13 +102,15 @@ public static class MameSourcefile
 
             foreach (var kvp in sourcefileDocs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var uniqueSafeName = kvp.Key;
                 var filteredDoc = kvp.Value;
                 var outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{uniqueSafeName}.xml");
 
                 try
                 {
-                    await Task.Run(() => filteredDoc.Save(outputFilePath));
+                    await Task.Run(() => filteredDoc.Save(outputFilePath), cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -113,10 +119,11 @@ public static class MameSourcefile
                 }
 
                 savedCount++;
-                if (savedCount % 10 != 0 && savedCount != totalToSave) continue;
-
-                var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
-                progress.Report(saveProgress);
+                if (savedCount % 10 == 0 || savedCount == totalToSave)
+                {
+                    var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
+                    progress.Report(saveProgress);
+                }
             }
 
             progress.Report(100);
@@ -128,16 +135,5 @@ public static class MameSourcefile
             await logService.LogExceptionAsync(ex, "Error in method MAMESourcefile.CreateAndSaveMameSourcefileAsync");
             throw;
         }
-    }
-
-    private static string ReplaceInvalidFileNameChars(string fileName)
-    {
-        var invalidChars = Path.GetInvalidFileNameChars();
-        foreach (var invalidChar in invalidChars)
-        {
-            fileName = fileName.Replace(invalidChar, '_');
-        }
-
-        return fileName;
     }
 }

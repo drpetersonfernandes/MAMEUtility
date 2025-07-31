@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
@@ -22,7 +22,8 @@ public partial class LogWindow
     private void OnLogMessageAdded(object? sender, string message)
     {
         // The LogService ensures this is called on the UI thread.
-        LogTextBox.AppendText(message + Environment.NewLine);
+        // AppendText already handles newlines, so just append the message as is.
+        LogTextBox.AppendText(message);
     }
 
     private void ClearButton_Click(object sender, RoutedEventArgs e)
@@ -36,7 +37,6 @@ public partial class LogWindow
         LogTextBox.ScrollToEnd();
     }
 
-    // Unsubscribe from event when window closes to prevent potential memory leaks
     protected override void OnClosed(EventArgs e)
     {
         _logService.LogMessageAdded -= OnLogMessageAdded;

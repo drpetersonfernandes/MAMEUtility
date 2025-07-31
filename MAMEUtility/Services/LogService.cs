@@ -4,7 +4,8 @@ using System.Text;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Threading;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
+using MAMEUtility.Models;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
 
@@ -15,7 +16,7 @@ public class LogService : ILogService, IDisposable
     private readonly IBugReportService _bugReportService;
     private readonly string _logFilePath;
     private LogWindow? _logWindow;
-    private readonly Dispatcher _dispatcher;
+    private readonly Dispatcher? _dispatcher; // Made nullable
     private readonly SemaphoreSlim _logFileSemaphore = new(1, 1); // For thread-safe file access
 
     public event EventHandler<string>? LogMessageAdded;
@@ -24,13 +25,7 @@ public class LogService : ILogService, IDisposable
     {
         _bugReportService = bugReportService;
         _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MAMEUtilityLog.txt");
-
-        if (Application.Current == null)
-        {
-            throw new InvalidOperationException("Application.Current is null. LogService cannot be initialized without a running WPF application.");
-        }
-
-        _dispatcher = Application.Current.Dispatcher;
+        _dispatcher = Application.Current?.Dispatcher;
 
         try
         {
@@ -48,7 +43,7 @@ public class LogService : ILogService, IDisposable
 
     public void ShowLogWindow()
     {
-        if (!_dispatcher.CheckAccess())
+        if (_dispatcher?.CheckAccess() == false) // Null check _dispatcher
         {
             _dispatcher.Invoke(ShowLogWindowInternal);
         }
@@ -99,7 +94,12 @@ public class LogService : ILogService, IDisposable
 
             var formattedMessage = FormatLogMessage(message, LogLevel.Info);
             _ = LogToFileAsync(formattedMessage);
-            _dispatcher.BeginInvoke(() => LogMessageAdded?.Invoke(this, formattedMessage.TrimEnd(Environment.NewLine.ToCharArray())));
+
+            _dispatcher?.BeginInvoke(() =>
+            {
+                var handlers = LogMessageAdded;
+                handlers?.Invoke(this, formattedMessage);
+            });
         }
         catch (Exception ex)
         {
@@ -115,11 +115,12 @@ public class LogService : ILogService, IDisposable
             if (string.IsNullOrWhiteSpace(message)) return;
 
             var formattedMessage = FormatLogMessage(message, LogLevel.Error);
-            var userMessage = $"Error: {message}";
+
             _ = LogToFileAsync(formattedMessage);
-            _dispatcher.BeginInvoke(() =>
+            _dispatcher?.BeginInvoke(() => // Null check _dispatcher
             {
-                LogMessageAdded?.Invoke(this, userMessage);
+                var handlers = LogMessageAdded;
+                handlers?.Invoke(this, formattedMessage); // Pass formattedMessage
                 AskUserToOpenLogFile();
             });
         }
@@ -150,11 +151,12 @@ public class LogService : ILogService, IDisposable
             if (string.IsNullOrWhiteSpace(message)) return;
 
             var formattedMessage = FormatLogMessage(message, LogLevel.Warning);
-            var userMessage = $"Warning: {message}";
+
             _ = LogToFileAsync(formattedMessage);
-            _dispatcher.BeginInvoke(() =>
+            _dispatcher?.BeginInvoke(() => // Null check _dispatcher
             {
-                LogMessageAdded?.Invoke(this, userMessage);
+                var handlers = LogMessageAdded;
+                handlers?.Invoke(this, formattedMessage); // Pass formattedMessage
                 AskUserToOpenLogFile(MessageBoxImage.Warning);
             });
         }
@@ -176,14 +178,14 @@ public class LogService : ILogService, IDisposable
             }
 
             var errorMessage = FormatExceptionMessage(exception, additionalInfo);
-            var userMessage = $"Error: {exception.GetType().Name} - {exception.Message}";
 
             await LogToFileAsync(errorMessage);
             await _bugReportService.SendExceptionReportAsync(exception);
 
-            _ = _dispatcher.BeginInvoke(() =>
+            _ = _dispatcher?.BeginInvoke(() => // Null check _dispatcher
             {
-                LogMessageAdded?.Invoke(this, userMessage);
+                var handlers = LogMessageAdded;
+                handlers?.Invoke(this, errorMessage); // Pass the full formatted error message
                 AskUserToOpenLogFile();
             });
         }
@@ -224,6 +226,7 @@ public class LogService : ILogService, IDisposable
 
     private static string FormatLogMessage(string message, LogLevel level)
     {
+        // Ensure Environment.NewLine is consistently added here, and only here.
         return $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level,-7}] {message}{Environment.NewLine}";
     }
 
@@ -258,13 +261,13 @@ public class LogService : ILogService, IDisposable
         }
 
         sb.AppendLine("--- End Exception Details ---");
-        sb.AppendLine();
+        sb.AppendLine(); // Add a final newline for separation in the log file
         return sb.ToString();
     }
 
     private void AskUserToOpenLogFile(MessageBoxImage messageBoxImage = MessageBoxImage.Error)
     {
-        if (!_dispatcher.CheckAccess())
+        if (_dispatcher?.CheckAccess() == false) // Null check _dispatcher
         {
             _dispatcher.BeginInvoke(() => AskUserToOpenLogFileInternal(messageBoxImage));
             return;
@@ -289,7 +292,10 @@ public class LogService : ILogService, IDisposable
                 return;
             }
 
-            var psi = new ProcessStartInfo(_logFilePath) { UseShellExecute = true };
+            var psi = new ProcessStartInfo(_logFilePath)
+            {
+                UseShellExecute = true
+            };
             Process.Start(psi);
         }
         catch (Exception ex)
@@ -322,7 +328,15 @@ public class LogService : ILogService, IDisposable
         if (disposing)
         {
             _logFileSemaphore?.Dispose();
-            _dispatcher?.Invoke(() => _logWindow?.Close());
+
+            // Close the window asynchronously to avoid dispatcher deadlock
+            if (_dispatcher != null)
+            {
+                if (_dispatcher.CheckAccess())
+                    _logWindow?.Close(); // already on UI thread
+                else
+                    _dispatcher.BeginInvoke(() => _logWindow?.Close());
+            }
         }
 
         _logWindow = null;

@@ -1,5 +1,5 @@
 ﻿using System.Windows;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 using Microsoft.Win32; // Use this for OpenFolderDialog
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;

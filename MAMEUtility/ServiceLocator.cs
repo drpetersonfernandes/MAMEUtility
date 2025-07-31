@@ -1,5 +1,5 @@
-﻿using MAMEUtility.Services;
-using MAMEUtility.Services.Interfaces;
+﻿using MAMEUtility.Interfaces;
+using MAMEUtility.Services;
 
 namespace MAMEUtility;
 

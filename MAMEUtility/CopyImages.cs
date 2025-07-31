@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
-using System.Threading;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
@@ -51,23 +50,24 @@ public static class CopyImages
 
             try
             {
+                var currentFileIndex = filesProcessed; // Capture current index before processing
                 var fileProgress = new Progress<int>(percent =>
                 {
-                    // Calculate weighted progress
-                    var weightedPercentage = (double)filesProcessed / totalFiles * 100 + (double)percent / totalFiles;
+                    // Calculate weighted progress: (completed files + current file's percentage) / total files * 100
+                    var weightedPercentage = (currentFileIndex + percent / 100.0) / totalFiles * 100.0;
                     progress.Report((int)weightedPercentage);
                 });
 
                 await ProcessXmlFileAsync(
-                    xmlFilePath, 
-                    sourceDirectory, 
-                    destinationDirectory, 
-                    fileProgress, 
+                    xmlFilePath,
+                    sourceDirectory,
+                    destinationDirectory,
+                    fileProgress,
                     logService,
                     cancellationToken
                 );
 
-                filesProcessed++;
+                filesProcessed++; // Increment only after the file is fully processed
 
                 // Batch logging
                 if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
@@ -75,12 +75,17 @@ public static class CopyImages
                     logService.Log($"Overall Progress: {filesProcessed}/{totalFiles} XML files processed.");
                 }
 
+                // Report 100% for this file's contribution to overall progress
                 progress.Report((int)((double)filesProcessed / totalFiles * 100));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
                 await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
+                // Even if an error occurs, we still count it as "processed" for overall progress calculation
+                // to ensure the progress bar eventually reaches 100% for the total number of files attempted.
+                filesProcessed++;
+                progress.Report((int)((double)filesProcessed / totalFiles * 100));
             }
         }
 
@@ -141,14 +146,8 @@ public static class CopyImages
 
             try
             {
-                // Throughput optimization
-                if (machinesProcessed % 10 == 0)
-                {
-                    await Task.Delay(1, cancellationToken); // Yield to thread pool
-                }
-
-                await Task.Run(() => 
-                    ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService),
+                await Task.Run(() =>
+                        ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService),
                     cancellationToken
                 );
             }
@@ -178,7 +177,7 @@ public static class CopyImages
         progress.Report(100);
     }
 
-    private static void ProcessMachine(string machineName, string sourceDirectory, string destinationDirectory, ILogService logService)
+    private static void ProcessMachine(string? machineName, string sourceDirectory, string destinationDirectory, ILogService logService)
     {
         try
         {

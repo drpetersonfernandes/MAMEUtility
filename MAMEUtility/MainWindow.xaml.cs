@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using MAMEUtility.Services.Interfaces;
 using Application = System.Windows.Application;
 using System.Windows.Threading;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
@@ -12,11 +12,8 @@ public partial class MainWindow
     private readonly ILogService _logService;
     private readonly IDialogService _dialogService;
     private readonly IMameProcessingService _mameProcessingService;
-
     private readonly DispatcherTimer _processingTimer;
     private readonly Stopwatch _processingStopwatch;
-    private readonly DispatcherTimer _progressUpdateTimer;
-
     private CancellationTokenSource? _cancellationTokenSource;
 
     public MainWindow()
@@ -36,39 +33,37 @@ public partial class MainWindow
         };
         _processingTimer.Tick += ProcessingTimer_Tick;
 
-        // Initialize timer for progress updates (more frequent)
-        _progressUpdateTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(100)
-        };
-        _progressUpdateTimer.Tick += ProgressUpdateTimer_Tick;
-
         _processingStopwatch = new Stopwatch();
     }
+
+    public static string VersionText => AboutWindow.ApplicationVersion;
 
     private void ProcessingTimer_Tick(object? sender, EventArgs e)
     {
         ElapsedTimeTextBlock.Text = $"Elapsed: {_processingStopwatch.Elapsed:mm\\:ss}";
     }
 
-    private void ProgressUpdateTimer_Tick(object? sender, EventArgs e)
-    {
-        // This ensures the UI stays responsive during long operations
-        // The actual progress updates come from the Progress<T> callbacks
-    }
-
     private void SetProcessingState(bool isProcessing, string? operationName = null)
     {
         ProcessingOverlay.Visibility = isProcessing ? Visibility.Visible : Visibility.Collapsed;
+        StatusBarText.Text = isProcessing ? $"{operationName} in progress..." : "Ready";
 
-        // Update processing text
-        if (isProcessing && !string.IsNullOrEmpty(operationName))
+        if (isProcessing)
         {
-            ProcessingTextBlock.Text = $"Processing {operationName}...";
+            ProcessingTextBlock.Text = !string.IsNullOrEmpty(operationName)
+                ? $"Processing {operationName}..."
+                : "Processing...";
+
+            _cancellationTokenSource = new CancellationTokenSource();
+            _processingStopwatch.Restart();
+            _processingTimer.Start();
         }
         else
         {
-            ProcessingTextBlock.Text = "Processing...";
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+            _processingStopwatch.Stop();
+            _processingTimer.Stop();
         }
 
         // Disable/Enable all operational buttons
@@ -91,7 +86,6 @@ public partial class MainWindow
             _processingStopwatch.Reset();
             _processingStopwatch.Start();
             _processingTimer.Start();
-            _progressUpdateTimer.Start();
             ElapsedTimeTextBlock.Text = "Elapsed: 00:00";
             OverallProgressBar.Value = 0;
         }
@@ -102,7 +96,6 @@ public partial class MainWindow
 
             _processingStopwatch.Stop();
             _processingTimer.Stop();
-            _progressUpdateTimer.Stop();
         }
     }
 
@@ -112,7 +105,7 @@ public partial class MainWindow
         {
             SetProcessingState(true, "MAME Full List");
 
-            var token = _cancellationTokenSource!.Token;
+            var token = _cancellationTokenSource!.Token; // This line was missing
 
             _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             var inputFilePaths = _dialogService.ShowOpenFileDialog(
@@ -167,6 +160,8 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Manufacturer Lists");
 
+            var token = _cancellationTokenSource!.Token; // Add this line
+
             _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             var inputFilePaths = _dialogService.ShowOpenFileDialog(
                 "Select MAME full driver information in XML",
@@ -194,8 +189,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress);
+            await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress, token);
             _logService.Log("Data extracted and saved successfully for all manufacturers.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -213,6 +212,8 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Year Lists");
 
+            var token = _cancellationTokenSource!.Token; // Add this line
+
             _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             var inputFilePaths = _dialogService.ShowOpenFileDialog(
                 "Select MAME full driver information in XML",
@@ -240,8 +241,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress);
+            await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress, token);
             _logService.Log("XML files created successfully for all years.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -259,6 +264,8 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Sourcefile Lists");
 
+            var token = _cancellationTokenSource!.Token; // Add this line
+
             _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
             var inputFilePaths = _dialogService.ShowOpenFileDialog(
                 "Select MAME full driver information in XML",
@@ -286,8 +293,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress);
+            await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress, token);
             _logService.Log("Data extracted and saved successfully for all source files.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -304,6 +315,8 @@ public partial class MainWindow
         try
         {
             SetProcessingState(true, "Software List");
+
+            var token = _cancellationTokenSource!.Token; // Add this line
 
             _logService.Log("Select the folder containing XML files to process.");
             var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the folder containing XML files to process");
@@ -331,8 +344,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress);
+            await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress, token);
             _logService.Log("Consolidated XML file created successfully.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -349,6 +366,8 @@ public partial class MainWindow
         try
         {
             SetProcessingState(true, "List Merging");
+
+            var token = _cancellationTokenSource!.Token;
 
             _logService.Log("Select XML files to merge. You can select multiple XML files.");
             var inputFilePaths = _dialogService.ShowOpenFileDialog(
@@ -375,9 +394,18 @@ public partial class MainWindow
             }
 
             var outputDatPath = Path.ChangeExtension(outputXmlPath, ".dat");
-            await _mameProcessingService.MergeListsAsync(inputFilePaths, outputXmlPath, outputDatPath);
+
+            var progress = new Progress<int>(value =>
+            {
+                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+            });
+
+            await _mameProcessingService.MergeListsAsync(inputFilePaths, outputXmlPath, outputDatPath, progress, token);
             _logService.Log($"Merging completed. Created XML file ({outputXmlPath}) and DAT file ({outputDatPath}).");
-            OverallProgressBar.Value = 100;
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -394,6 +422,8 @@ public partial class MainWindow
         try
         {
             SetProcessingState(true, "ROM Copy");
+
+            var token = _cancellationTokenSource!.Token; // Add this line
 
             _logService.Log("Select the source directory containing the ROMs.");
             var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the ROMs");
@@ -430,8 +460,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CopyRomsAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress);
+            await _mameProcessingService.CopyRomsAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
             _logService.Log("ROM copy operation is finished.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {
@@ -448,6 +482,8 @@ public partial class MainWindow
         try
         {
             SetProcessingState(true, "Image Copy");
+
+            var token = _cancellationTokenSource!.Token;
 
             _logService.Log("Select the source directory containing the images.");
             var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the images");
@@ -484,8 +520,12 @@ public partial class MainWindow
                 Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
             });
 
-            await _mameProcessingService.CopyImagesAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress);
+            await _mameProcessingService.CopyImagesAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
             _logService.Log("Image copy operation is finished.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logService.Log("Operation was cancelled by user");
         }
         catch (Exception ex)
         {

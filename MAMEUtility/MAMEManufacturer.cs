@@ -1,20 +1,19 @@
 ﻿using System.Collections.Concurrent;
 using System.IO;
-using System.Text.RegularExpressions;
+// using System.Text.RegularExpressions; // REMOVED: No longer needed here
 using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
-public partial class MameManufacturer
+public class MameManufacturer
 {
-    public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress, ILogService logService)
+    public static async Task CreateAndSaveMameManufacturerAsync(XDocument inputDoc, string outputFolderMameManufacturer, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
     {
         logService.Log($"Output folder for MAME Manufacturer: {outputFolderMameManufacturer}");
 
         try
         {
-            // Initial progress update
             progress.Report(5);
 
             logService.Log("Extracting manufacturers from XML...");
@@ -23,8 +22,7 @@ public partial class MameManufacturer
                     .Select(static m => (string?)m.Element("manufacturer"))
                     .Where(static m => !string.IsNullOrEmpty(m))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList()
-            );
+                    .ToList(), cancellationToken);
 
             progress.Report(10);
 
@@ -45,18 +43,18 @@ public partial class MameManufacturer
             {
                 Parallel.ForEach(manufacturers, new ParallelOptions
                 {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                    MaxDegreeOfParallelism = Environment.ProcessorCount,
+                    CancellationToken = cancellationToken
                 }, manufacturer =>
                 {
                     if (manufacturer == null) return;
 
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     try
                     {
-                        var safeManufacturerName = RemoveExtraWhitespace(manufacturer
-                                .Replace("<", "").Replace(">", "").Replace(":", "").Replace("\"", "")
-                                .Replace("/", "").Replace("\\", "").Replace("|", "").Replace("?", "")
-                                .Replace("*", "").Replace("unknown", "UnknownManufacturer").Trim())
-                            .Replace("&amp;", "&");
+                        // Use the new FileNameHelper for robust sanitization of the actual filename
+                        var safeManufacturerName = FileNameHelper.SanitizeForFileName(manufacturer);
 
                         var uniqueSafeName = safeManufacturerName;
                         var counter = 1;
@@ -71,11 +69,12 @@ public partial class MameManufacturer
 
                         var currentCount = Interlocked.Increment(ref processedCount);
 
-                        if (currentCount % logInterval != 0 && currentCount != totalManufacturers) return;
-
-                        logService.Log($"Processing progress: {currentCount}/{totalManufacturers} manufacturers");
-                        var progressPercentage = 10 + (int)((double)currentCount / totalManufacturers * 70);
-                        progress.Report(progressPercentage);
+                        if (currentCount % logInterval == 0 || currentCount == totalManufacturers)
+                        {
+                            logService.Log($"Processing progress: {currentCount}/{totalManufacturers} manufacturers");
+                            var progressPercentage = 10 + (int)((double)currentCount / totalManufacturers * 70);
+                            progress.Report(progressPercentage);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -83,7 +82,7 @@ public partial class MameManufacturer
                         _ = logService.LogExceptionAsync(ex, $"Error processing manufacturer '{manufacturer}'");
                     }
                 });
-            });
+            }, cancellationToken);
 
             progress.Report(80);
 
@@ -94,6 +93,8 @@ public partial class MameManufacturer
 
             foreach (var kvp in manufacturerDocs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var uniqueSafeName = kvp.Key;
                 var filteredDoc = kvp.Value;
                 var outputFilePath = Path.Combine(outputFolderMameManufacturer, $"{uniqueSafeName}.xml");
@@ -107,7 +108,7 @@ public partial class MameManufacturer
                         continue;
                     }
 
-                    await Task.Run(() => filteredDoc.Save(outputFilePath));
+                    await Task.Run(() => filteredDoc.Save(outputFilePath), cancellationToken);
                     logService.Log($"Saved manufacturer file: {uniqueSafeName} with {filteredDoc.Root.Elements("Machine").Count()} machines");
                 }
                 catch (Exception ex)
@@ -117,10 +118,11 @@ public partial class MameManufacturer
                 }
 
                 savedCount++;
-                if (savedCount % 10 != 0 && savedCount != totalToSave) continue;
-
-                var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
-                progress.Report(saveProgress);
+                if (savedCount % 10 == 0 || savedCount == totalToSave)
+                {
+                    var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
+                    progress.Report(saveProgress);
+                }
             }
 
             progress.Report(100);
@@ -142,8 +144,10 @@ public partial class MameManufacturer
             new XElement("Machines",
                 from machine in matchedMachines
                 select new XElement("Machine",
-                    new XElement("MachineName", RemoveExtraWhitespace(machine.Attribute("name")?.Value ?? "").Replace("&amp;", "&")),
-                    new XElement("Description", RemoveExtraWhitespace(machine.Element("description")?.Value ?? "").Replace("&amp;", "&"))
+                    // MachineName is a value, but also often used as a filename, so sanitize robustly for general use.
+                    new XElement("MachineName", FileNameHelper.SanitizeForFileName(machine.Attribute("name")?.Value ?? "", "")),
+                    // Description is just a value, so use SanitizeForXmlValue
+                    new XElement("Description", FileNameHelper.SanitizeForXmlValue(machine.Element("description")?.Value ?? ""))
                 )
             )
         );
@@ -158,15 +162,4 @@ public partial class MameManufacturer
                    (machine.Element("driver")?.Attribute("emulation")?.Value ?? "") == "good";
         }
     }
-
-    private static string RemoveExtraWhitespace(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return input;
-
-        return MyRegex().Replace(input, " ");
-    }
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex MyRegex();
 }

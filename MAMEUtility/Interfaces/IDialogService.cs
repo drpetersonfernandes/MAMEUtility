@@ -1,4 +1,4 @@
-﻿namespace MAMEUtility.Services.Interfaces;
+﻿namespace MAMEUtility.Interfaces;
 
 public interface IDialogService
 {

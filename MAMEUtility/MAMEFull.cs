@@ -1,12 +1,16 @@
-﻿using System.ComponentModel;
-using System.Xml.Linq;
-using MAMEUtility.Services.Interfaces;
+﻿using System.Xml.Linq;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameFull
 {
-    public static Task CreateAndSaveMameFullAsync(XDocument inputDoc, string outputFilePathMameFull, BackgroundWorker worker, ILogService logService)
+    public static Task CreateAndSaveMameFullAsync(
+        XDocument inputDoc,
+        string outputFilePathMameFull,
+        IProgress<int> progress,
+        ILogService logService,
+        CancellationToken cancellationToken = default)
     {
         logService.Log($"Output file for MAME Full: {outputFilePathMameFull}");
 
@@ -14,7 +18,7 @@ public static class MameFull
         {
             var machineElements = inputDoc.Descendants("machine").ToList();
             var totalMachines = machineElements.Count;
-            var machinesProcessed = 0;
+            var processed = 0;
 
             logService.Log($"Total machines: {totalMachines}");
             logService.Log("Processing machines...");
@@ -22,37 +26,33 @@ public static class MameFull
             const int logInterval = 500;
             const int progressInterval = 50;
 
-            XDocument allMachineDetailsDoc = new(new XElement("Machines"));
+            var doc = new XDocument(new XElement("Machines"));
 
-            foreach (var machine in machineElements)
+            foreach (var m in machineElements)
             {
-                var machineName = machine.Attribute("name")?.Value;
-                var description = machine.Element("description")?.Value;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                allMachineDetailsDoc.Root?.Add(
-                    new XElement("Machine",
-                        new XElement("MachineName", machineName),
-                        new XElement("Description", description)
-                    )
-                );
-
-                machinesProcessed++;
-
-                if (machinesProcessed % logInterval == 0 || machinesProcessed == totalMachines)
+                if (doc.Root != null)
                 {
-                    logService.Log($"Progress: {machinesProcessed}/{totalMachines} machines processed");
+                    doc.Root.Add(
+                        new XElement("Machine",
+                            new XElement("MachineName", m.Attribute("name")?.Value),
+                            new XElement("Description", m.Element("description")?.Value)));
                 }
 
-                if (machinesProcessed % progressInterval != 0 && machinesProcessed != totalMachines) continue;
+                processed++;
 
-                var progressPercentage = (int)((double)machinesProcessed / totalMachines * 100);
-                worker.ReportProgress(progressPercentage);
+                if (processed % logInterval == 0 || processed == totalMachines)
+                    logService.Log($"Progress: {processed}/{totalMachines} machines processed");
+
+                if (processed % progressInterval == 0 || processed == totalMachines)
+                    progress.Report((int)((double)processed / totalMachines * 100));
             }
 
             logService.Log("Saving to file...");
-            allMachineDetailsDoc.Save(outputFilePathMameFull);
-            worker.ReportProgress(100);
+            doc.Save(outputFilePathMameFull);
+            progress.Report(100);
             logService.Log("MAME Full XML file created successfully.");
-        });
+        }, cancellationToken);
     }
 }

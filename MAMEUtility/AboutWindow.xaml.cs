@@ -2,7 +2,7 @@
 using System.Reflection;
 using System.Windows;
 using System.Windows.Navigation;
-using MAMEUtility.Services.Interfaces;
+using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
@@ -48,11 +48,15 @@ public partial class AboutWindow
     {
         try
         {
-            Process.Start(new ProcessStartInfo
+            using var process = Process.Start(new ProcessStartInfo
             {
                 FileName = e.Uri.AbsoluteUri,
                 UseShellExecute = true
             });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.IO.IOException)
+        {
+            _logService.LogWarning($"Unable to open the link ({e.Uri.AbsoluteUri}): {ex.Message}");
         }
         catch (Exception ex)
         {
