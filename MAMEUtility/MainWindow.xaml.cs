@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using Application = System.Windows.Application;
@@ -34,6 +35,13 @@ public partial class MainWindow
         _processingTimer.Tick += ProcessingTimer_Tick;
 
         _processingStopwatch = new Stopwatch();
+
+        Closing += MainWindow_Closing;
+    }
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        Application.Current.Shutdown();
     }
 
     public static string VersionText => AboutWindow.ApplicationVersion;
