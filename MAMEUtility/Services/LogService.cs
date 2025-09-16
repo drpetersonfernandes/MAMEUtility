@@ -329,7 +329,7 @@ public class LogService : ILogService, IDisposable
         {
             _logFileSemaphore?.Dispose();
 
-            // Close the window asynchronously to avoid dispatcher deadlock
+            // Close the window asynchronously to avoid a dispatcher deadlock
             if (_dispatcher != null)
             {
                 if (_dispatcher.CheckAccess())
