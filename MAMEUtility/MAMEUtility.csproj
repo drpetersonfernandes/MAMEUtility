@@ -10,8 +10,8 @@
     <ApplicationIcon>icon\icon.ico</ApplicationIcon>
     <PackageIcon>icon2.png</PackageIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <AssemblyVersion>1.2.1</AssemblyVersion>
-    <FileVersion>1.2.1</FileVersion>
+    <AssemblyVersion>1.2.2</AssemblyVersion>
+    <FileVersion>1.2.2</FileVersion>
     <LangVersion>14</LangVersion>
     <NeutralLanguage>en-US</NeutralLanguage>
     <DebugType>embedded</DebugType>
