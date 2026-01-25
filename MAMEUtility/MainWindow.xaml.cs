@@ -39,7 +39,7 @@ public partial class MainWindow
         Closing += MainWindow_Closing;
     }
 
-    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    private static void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         Application.Current.Shutdown();
     }
@@ -113,39 +113,43 @@ public partial class MainWindow
         {
             SetProcessingState(true, "MAME Full List");
 
-            var token = _cancellationTokenSource!.Token; // This line was missing
-
-            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-            var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                "Select MAME full driver information in XML",
-                "XML files (*.xml)|*.xml");
-
-            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No input file selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token; // This line was missing
+
+                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+                var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Select MAME full driver information in XML",
+                    "XML files (*.xml)|*.xml");
+
+                if (inputFilePaths == null || inputFilePaths.Length == 0)
+                {
+                    _logService.Log("No input file selected. Operation cancelled.");
+                    return;
+                }
+
+                var inputFilePath = inputFilePaths[0];
+
+                _logService.Log("Put a name to your output file.");
+                var outputFilePath = _dialogService.ShowSaveFileDialog(
+                    "Save MAMEFull",
+                    "XML files (*.xml)|*.xml",
+                    "MAMEFull.xml");
+
+                if (string.IsNullOrEmpty(outputFilePath))
+                {
+                    _logService.Log("No output file specified for MAMEFull.xml. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress, token);
             }
 
-            var inputFilePath = inputFilePaths[0];
-
-            _logService.Log("Put a name to your output file.");
-            var outputFilePath = _dialogService.ShowSaveFileDialog(
-                "Save MAMEFull",
-                "XML files (*.xml)|*.xml",
-                "MAMEFull.xml");
-
-            if (string.IsNullOrEmpty(outputFilePath))
-            {
-                _logService.Log("No output file specified for MAMEFull.xml. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress, token);
             _logService.Log("Output file saved.");
         }
         catch (OperationCanceledException)
@@ -168,36 +172,40 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Manufacturer Lists");
 
-            var token = _cancellationTokenSource!.Token; // Add this line
-
-            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-            var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                "Select MAME full driver information in XML",
-                "XML files (*.xml)|*.xml");
-
-            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No input file selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token; // Add this line
+
+                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+                var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Select MAME full driver information in XML",
+                    "XML files (*.xml)|*.xml");
+
+                if (inputFilePaths == null || inputFilePaths.Length == 0)
+                {
+                    _logService.Log("No input file selected. Operation cancelled.");
+                    return;
+                }
+
+                var inputFilePath = inputFilePaths[0];
+
+                _logService.Log("Select Output Folder.");
+                var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
+
+                if (string.IsNullOrEmpty(outputFolderPath))
+                {
+                    _logService.Log("No output folder specified. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress, token);
             }
 
-            var inputFilePath = inputFilePaths[0];
-
-            _logService.Log("Select Output Folder.");
-            var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
-
-            if (string.IsNullOrEmpty(outputFolderPath))
-            {
-                _logService.Log("No output folder specified. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress, token);
             _logService.Log("Data extracted and saved successfully for all manufacturers.");
         }
         catch (OperationCanceledException)
@@ -220,36 +228,40 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Year Lists");
 
-            var token = _cancellationTokenSource!.Token; // Add this line
-
-            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-            var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                "Select MAME full driver information in XML",
-                "XML files (*.xml)|*.xml");
-
-            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No input file selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token; // Add this line
+
+                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+                var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Select MAME full driver information in XML",
+                    "XML files (*.xml)|*.xml");
+
+                if (inputFilePaths == null || inputFilePaths.Length == 0)
+                {
+                    _logService.Log("No input file selected. Operation cancelled.");
+                    return;
+                }
+
+                var inputFilePath = inputFilePaths[0];
+
+                _logService.Log("Select Output Folder.");
+                var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
+
+                if (string.IsNullOrEmpty(outputFolderPath))
+                {
+                    _logService.Log("No output folder specified. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress, token);
             }
 
-            var inputFilePath = inputFilePaths[0];
-
-            _logService.Log("Select Output Folder.");
-            var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
-
-            if (string.IsNullOrEmpty(outputFolderPath))
-            {
-                _logService.Log("No output folder specified. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress, token);
             _logService.Log("XML files created successfully for all years.");
         }
         catch (OperationCanceledException)
@@ -272,36 +284,40 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Sourcefile Lists");
 
-            var token = _cancellationTokenSource!.Token; // Add this line
-
-            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-            var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                "Select MAME full driver information in XML",
-                "XML files (*.xml)|*.xml");
-
-            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No input file selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token; // Add this line
+
+                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+                var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Select MAME full driver information in XML",
+                    "XML files (*.xml)|*.xml");
+
+                if (inputFilePaths == null || inputFilePaths.Length == 0)
+                {
+                    _logService.Log("No input file selected. Operation cancelled.");
+                    return;
+                }
+
+                var inputFilePath = inputFilePaths[0];
+
+                _logService.Log("Select Output Folder.");
+                var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
+
+                if (string.IsNullOrEmpty(outputFolderPath))
+                {
+                    _logService.Log("No output folder specified. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress, token);
             }
 
-            var inputFilePath = inputFilePaths[0];
-
-            _logService.Log("Select Output Folder.");
-            var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
-
-            if (string.IsNullOrEmpty(outputFolderPath))
-            {
-                _logService.Log("No output folder specified. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress, token);
             _logService.Log("Data extracted and saved successfully for all source files.");
         }
         catch (OperationCanceledException)
@@ -324,35 +340,39 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Software List");
 
-            var token = _cancellationTokenSource!.Token; // Add this line
-
-            _logService.Log("Select the folder containing XML files to process.");
-            var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the folder containing XML files to process");
-
-            if (string.IsNullOrEmpty(inputFolderPath))
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No folder selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token; // Add this line
+
+                _logService.Log("Select the folder containing XML files to process.");
+                var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the folder containing XML files to process");
+
+                if (string.IsNullOrEmpty(inputFolderPath))
+                {
+                    _logService.Log("No folder selected. Operation cancelled.");
+                    return;
+                }
+
+                _logService.Log("Choose a location to save the consolidated output XML file.");
+                var outputFilePath = _dialogService.ShowSaveFileDialog(
+                    "Save Consolidated XML File",
+                    "XML Files (*.xml)|*.xml",
+                    "MAMESoftwareList.xml");
+
+                if (string.IsNullOrEmpty(outputFilePath))
+                {
+                    _logService.Log("No output file specified. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress, token);
             }
 
-            _logService.Log("Choose a location to save the consolidated output XML file.");
-            var outputFilePath = _dialogService.ShowSaveFileDialog(
-                "Save Consolidated XML File",
-                "XML Files (*.xml)|*.xml",
-                "MAMESoftwareList.xml");
-
-            if (string.IsNullOrEmpty(outputFilePath))
-            {
-                _logService.Log("No output file specified. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress, token);
             _logService.Log("Consolidated XML file created successfully.");
         }
         catch (OperationCanceledException)
@@ -375,41 +395,44 @@ public partial class MainWindow
         {
             SetProcessingState(true, "List Merging");
 
-            var token = _cancellationTokenSource!.Token;
-
-            _logService.Log("Select XML files to merge. You can select multiple XML files.");
-            var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                "Select XML files to merge",
-                "XML files (*.xml)|*.xml",
-                true);
-
-            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No input file selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token;
+
+                _logService.Log("Select XML files to merge. You can select multiple XML files.");
+                var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Select XML files to merge",
+                    "XML files (*.xml)|*.xml",
+                    true);
+
+                if (inputFilePaths == null || inputFilePaths.Length == 0)
+                {
+                    _logService.Log("No input file selected. Operation cancelled.");
+                    return;
+                }
+
+                _logService.Log("Select where to save the merged XML file.");
+                var outputXmlPath = _dialogService.ShowSaveFileDialog(
+                    "Save Merged XML",
+                    "XML files (*.xml)|*.xml",
+                    "Merged.xml");
+
+                if (string.IsNullOrEmpty(outputXmlPath))
+                {
+                    _logService.Log("No output file specified for merged XML. Operation cancelled.");
+                    return;
+                }
+
+                var outputDatPath = Path.ChangeExtension(outputXmlPath, ".dat");
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.MergeListsAsync(inputFilePaths, outputXmlPath, outputDatPath, progress, token);
+                _logService.Log($"Merging completed. Created XML file ({outputXmlPath}) and DAT file ({outputDatPath}).");
             }
-
-            _logService.Log("Select where to save the merged XML file.");
-            var outputXmlPath = _dialogService.ShowSaveFileDialog(
-                "Save Merged XML",
-                "XML files (*.xml)|*.xml",
-                "Merged.xml");
-
-            if (string.IsNullOrEmpty(outputXmlPath))
-            {
-                _logService.Log("No output file specified for merged XML. Operation cancelled.");
-                return;
-            }
-
-            var outputDatPath = Path.ChangeExtension(outputXmlPath, ".dat");
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.MergeListsAsync(inputFilePaths, outputXmlPath, outputDatPath, progress, token);
-            _logService.Log($"Merging completed. Created XML file ({outputXmlPath}) and DAT file ({outputDatPath}).");
         }
         catch (OperationCanceledException)
         {
@@ -431,44 +454,48 @@ public partial class MainWindow
         {
             SetProcessingState(true, "ROM Copy");
 
-            var token = _cancellationTokenSource!.Token; // Add this line
-
-            _logService.Log("Select the source directory containing the ROMs.");
-            var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the ROMs");
-
-            if (string.IsNullOrEmpty(sourceDirectory))
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("You did not provide the source directory containing the ROMs. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token; // Add this line
+
+                _logService.Log("Select the source directory containing the ROMs.");
+                var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the ROMs");
+
+                if (string.IsNullOrEmpty(sourceDirectory))
+                {
+                    _logService.Log("You did not provide the source directory containing the ROMs. Operation cancelled.");
+                    return;
+                }
+
+                _logService.Log("Select the destination directory for the ROMs.");
+                var destinationDirectory = _dialogService.ShowFolderBrowserDialog("Select the destination directory for the ROMs");
+
+                if (string.IsNullOrEmpty(destinationDirectory))
+                {
+                    _logService.Log("You did not select a destination directory for the ROMs. Operation cancelled.");
+                    return;
+                }
+
+                _logService.Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
+                var xmlFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Please select the XML file(s) containing ROM information",
+                    "XML Files (*.xml)|*.xml",
+                    true);
+
+                if (xmlFilePaths == null || xmlFilePaths.Length == 0)
+                {
+                    _logService.Log("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CopyRomsAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
             }
 
-            _logService.Log("Select the destination directory for the ROMs.");
-            var destinationDirectory = _dialogService.ShowFolderBrowserDialog("Select the destination directory for the ROMs");
-
-            if (string.IsNullOrEmpty(destinationDirectory))
-            {
-                _logService.Log("You did not select a destination directory for the ROMs. Operation cancelled.");
-                return;
-            }
-
-            _logService.Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
-            var xmlFilePaths = _dialogService.ShowOpenFileDialog(
-                "Please select the XML file(s) containing ROM information",
-                "XML Files (*.xml)|*.xml",
-                true);
-
-            if (xmlFilePaths == null || xmlFilePaths.Length == 0)
-            {
-                _logService.Log("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CopyRomsAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
             _logService.Log("ROM copy operation is finished.");
         }
         catch (OperationCanceledException)
@@ -491,44 +518,48 @@ public partial class MainWindow
         {
             SetProcessingState(true, "Image Copy");
 
-            var token = _cancellationTokenSource!.Token;
-
-            _logService.Log("Select the source directory containing the images.");
-            var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the images");
-
-            if (string.IsNullOrEmpty(sourceDirectory))
+            if (_cancellationTokenSource != null)
             {
-                _logService.Log("No source directory selected. Operation cancelled.");
-                return;
+                var token = _cancellationTokenSource.Token;
+
+                _logService.Log("Select the source directory containing the images.");
+                var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the images");
+
+                if (string.IsNullOrEmpty(sourceDirectory))
+                {
+                    _logService.Log("No source directory selected. Operation cancelled.");
+                    return;
+                }
+
+                _logService.Log("Select the destination directory for the images.");
+                var destinationDirectory = _dialogService.ShowFolderBrowserDialog("Select the destination directory for the images");
+
+                if (string.IsNullOrEmpty(destinationDirectory))
+                {
+                    _logService.Log("No destination directory selected. Operation cancelled.");
+                    return;
+                }
+
+                _logService.Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
+                var xmlFilePaths = _dialogService.ShowOpenFileDialog(
+                    "Please select the XML file(s) containing ROM information",
+                    "XML Files (*.xml)|*.xml",
+                    true);
+
+                if (xmlFilePaths == null || xmlFilePaths.Length == 0)
+                {
+                    _logService.Log("No XML files selected. Operation cancelled.");
+                    return;
+                }
+
+                var progress = new Progress<int>(value =>
+                {
+                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                });
+
+                await _mameProcessingService.CopyImagesAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
             }
 
-            _logService.Log("Select the destination directory for the images.");
-            var destinationDirectory = _dialogService.ShowFolderBrowserDialog("Select the destination directory for the images");
-
-            if (string.IsNullOrEmpty(destinationDirectory))
-            {
-                _logService.Log("No destination directory selected. Operation cancelled.");
-                return;
-            }
-
-            _logService.Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
-            var xmlFilePaths = _dialogService.ShowOpenFileDialog(
-                "Please select the XML file(s) containing ROM information",
-                "XML Files (*.xml)|*.xml",
-                true);
-
-            if (xmlFilePaths == null || xmlFilePaths.Length == 0)
-            {
-                _logService.Log("No XML files selected. Operation cancelled.");
-                return;
-            }
-
-            var progress = new Progress<int>(value =>
-            {
-                Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
-            });
-
-            await _mameProcessingService.CopyImagesAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
             _logService.Log("Image copy operation is finished.");
         }
         catch (OperationCanceledException)

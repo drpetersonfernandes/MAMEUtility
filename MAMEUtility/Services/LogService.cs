@@ -57,21 +57,20 @@ public class LogService : ILogService, IDisposable
     {
         try
         {
-            if (_logWindow is { IsLoaded: true, IsVisible: true })
+            switch (_logWindow)
             {
-                _logWindow.Activate();
-                return;
-            }
-
-            if (_logWindow is { IsLoaded: false })
-            {
-                _logWindow = null;
+                case { IsLoaded: true, IsVisible: true }:
+                    _logWindow.Activate();
+                    return;
+                case { IsLoaded: false }:
+                    _logWindow = null;
+                    break;
             }
 
             if (_logWindow == null)
             {
                 _logWindow = new LogWindow();
-                _logWindow.Closed += (sender, args) => { _logWindow = null; };
+                _logWindow.Closed += (_, _) => { _logWindow = null; };
             }
 
             _logWindow.Show();
@@ -171,12 +170,6 @@ public class LogService : ILogService, IDisposable
     {
         try
         {
-            if (exception == null)
-            {
-                LogWarning("LogExceptionAsync called with null exception.");
-                return;
-            }
-
             var errorMessage = FormatExceptionMessage(exception, additionalInfo);
 
             await LogToFileAsync(errorMessage);
@@ -195,13 +188,13 @@ public class LogService : ILogService, IDisposable
             try
             {
                 var fallbackMsg = $"[LogService Internal Error] Error in LogExceptionAsync: {ex.Message}{Environment.NewLine}" +
-                                  $"Original exception: {exception?.GetType().Name} - {exception?.Message}{Environment.NewLine}";
+                                  $"Original exception: {exception.GetType().Name} - {exception.Message}{Environment.NewLine}";
                 await LogToFileAsync(fallbackMsg);
             }
             catch
             {
                 Debug.WriteLine("Critical failure in logging.");
-                if (exception != null) Debug.WriteLine($"Original exception: {exception.Message}");
+                Debug.WriteLine($"Original exception: {exception.Message}");
             }
         }
     }
@@ -327,7 +320,7 @@ public class LogService : ILogService, IDisposable
 
         if (disposing)
         {
-            _logFileSemaphore?.Dispose();
+            _logFileSemaphore.Dispose();
 
             // Close the window asynchronously to avoid a dispatcher deadlock
             if (_dispatcher != null)

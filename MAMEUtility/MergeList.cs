@@ -106,7 +106,7 @@ public static class MergeList
 
         // Create the final merged XDocument from unique machines
         XDocument mergedDoc = new(new XElement("Machines",
-            uniqueMachines.Values.Select(m => new XElement("Machine",
+            uniqueMachines.Values.Select(static m => new XElement("Machine",
                 new XElement("MachineName", m.MachineName),
                 new XElement("Description", m.Description)
             ))

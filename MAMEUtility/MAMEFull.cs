@@ -1,4 +1,4 @@
-﻿using System.Xml.Linq;
+using System.Xml;
 using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
@@ -6,7 +6,7 @@ namespace MAMEUtility;
 public static class MameFull
 {
     public static Task CreateAndSaveMameFullAsync(
-        XDocument inputDoc,
+        string inputFilePath,
         string outputFilePathMameFull,
         IProgress<int> progress,
         ILogService logService,
@@ -16,41 +16,54 @@ public static class MameFull
 
         return Task.Run(() =>
         {
-            var machineElements = inputDoc.Descendants("machine").ToList();
-            var totalMachines = machineElements.Count;
-            var processed = 0;
+            var settings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                IgnoreWhitespace = true
+            };
 
-            logService.Log($"Total machines: {totalMachines}");
-            logService.Log("Processing machines...");
+            using var reader = XmlReader.Create(inputFilePath, settings);
+            using var writer = XmlWriter.Create(outputFilePathMameFull, new XmlWriterSettings { Indent = true });
 
-            const int logInterval = 500;
-            const int progressInterval = 50;
+            writer.WriteStartDocument();
+            writer.WriteStartElement("Machines");
 
-            var doc = new XDocument(new XElement("Machines"));
+            long processed = 0;
+            const int logInterval = 5000;
 
-            foreach (var m in machineElements)
+            while (reader.Read())
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (doc.Root != null)
+                if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                 {
-                    doc.Root.Add(
-                        new XElement("Machine",
-                            new XElement("MachineName", m.Attribute("name")?.Value),
-                            new XElement("Description", m.Element("description")?.Value)));
+                    var name = reader.GetAttribute("name");
+                    using var subReader = reader.ReadSubtree();
+                    string? description = null;
+
+                    while (subReader.Read())
+                    {
+                        if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                        {
+                            description = subReader.ReadElementContentAsString();
+                            break;
+                        }
+                    }
+
+                    writer.WriteStartElement("Machine");
+                    writer.WriteElementString("MachineName", name);
+                    writer.WriteElementString("Description", description ?? "");
+                    writer.WriteEndElement();
+
+                    processed++;
+                    if (processed % logInterval == 0)
+                        logService.Log($"Progress: {processed} machines processed...");
                 }
-
-                processed++;
-
-                if (processed % logInterval == 0 || processed == totalMachines)
-                    logService.Log($"Progress: {processed}/{totalMachines} machines processed");
-
-                if (processed % progressInterval == 0 || processed == totalMachines)
-                    progress.Report((int)((double)processed / totalMachines * 100));
             }
 
-            logService.Log("Saving to file...");
-            doc.Save(outputFilePathMameFull);
+            writer.WriteEndElement();
+            writer.WriteEndDocument();
+
             progress.Report(100);
             logService.Log("MAME Full XML file created successfully.");
         }, cancellationToken);

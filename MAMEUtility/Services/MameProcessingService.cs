@@ -1,4 +1,4 @@
-﻿using System.Xml.Linq;
+using System.Xml.Linq;
 using MAMEUtility.Interfaces;
 
 namespace MAMEUtility.Services;
@@ -15,8 +15,12 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
-            await MameFull.CreateAndSaveMameFullAsync(inputDoc, outputFilePath, progress, _logService, cancellationToken);
+            await MameFull.CreateAndSaveMameFullAsync(inputFilePath, outputFilePath, progress, _logService, cancellationToken);
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated. It ended unexpectedly at line {ex.LineNumber}. Please re-download or re-generate the MAME XML file.");
+            throw;
         }
         catch (Exception ex)
         {
@@ -29,8 +33,12 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
-            await MameManufacturer.CreateAndSaveMameManufacturerAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
+            await MameManufacturer.CreateAndSaveMameManufacturerAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
+            throw;
         }
         catch (Exception ex)
         {
