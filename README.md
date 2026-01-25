@@ -2,55 +2,65 @@
 
 ## Overview
 
-MAME Utility is a tool designed to help manage and organize MAME (Multiple Arcade Machine Emulator) data. It provides functionalities to create lists based on various criteria, merge lists, and copy ROMs and images.
+MAME Utility is a high-performance Windows tool designed to manage, organize, and filter MAME (Multiple Arcade Machine Emulator) data. It allows users to generate specialized XML lists, merge databases into optimized formats, and manage ROM/image collections with ease.
 
 ![Screenshot](screenshot1.png)
 
 ## Features
 
--   **Create MAME Lists**: Generate XML lists based on:
-    -   Full driver information
-    -   Manufacturer
-    -   Year
-    -   Source file
-    -   Software list
--   **Merge Lists**: Combine multiple XML lists into a single XML and DAT file.  The DAT file is in MessagePack format, compatible with SimpleLauncher's MameConfig.
--   **Copy ROMs**: Copy ROM files (ZIP) from a source directory to a destination directory based on an XML list.
--   **Copy Images**: Copy image files (PNG, JPG, JPEG) from a source directory to a destination directory based on an XML list.
--   **Logging**: Provides a log window to display the progress and any errors encountered during operations.
--   **Progress Tracking**: A progress bar provides visual feedback on long-running operations.
+-   **High-Performance List Generation**: Generate filtered XML lists based on:
+    -   **Full Driver Info**: Simplified name/description mapping.
+    -   **Manufacturer**: Separate files for every manufacturer (e.g., Capcom.xml, Nintendo.xml).
+    -   **Year**: Organized by release year.
+    -   **Source File**: Organized by MAME driver source code.
+    -   **Software List**: Consolidated XMLs from MAME software list directories.
+-   **Parallel Processing**: Utilizes multi-core processing for heavy XML parsing and file operations, significantly reducing wait times.
+-   **Smart Merging**: Combine multiple XML lists (both Machine and Software formats) into a single XML.
+-   **SimpleLauncher Compatibility**: Automatically generates a `.dat` file in **MessagePack** format during merging, fully compatible with SimpleLauncher's MameConfig.
+-   **Collection Management**:
+    -   **Copy ROMs**: Batch copy ZIP files based on filtered XML lists.
+    -   **Copy Images**: Supports PNG, JPG, and JPEG synchronization based on XML entries.
+-   **Robust UI & Feedback**:
+    -   Real-time progress tracking with percentage and elapsed time.
+    -   **Cancellation Support**: Safely stop long-running operations at any time.
+    -   Integrated Log Window for detailed operation history and error debugging.
+-   **Automated Bug Reporting**: Optional integration to report critical exceptions to improve software stability.
 
 ## Usage
 
 1.  **Create Lists**:
-    -   Select the desired list type from the main window (e.g., "Create MAME Manufacturer List").
-    -   Choose the MAME full driver information XML file as input. You can download this from the MAME website.
-    -   Specify the output folder or file path for the generated list.
+    -   Select a list type (e.g., "Create MAME Year List").
+    -   Provide the official MAME `listxml` output (usually a large XML file).
+    -   The utility will parse and split the data into your chosen directory.
 2.  **Merge Lists**:
-    -   Click the "Merge Lists" button.
-    -   Select multiple XML files to merge. The application supports both "Machines" and "Softwares" XML formats.
-    -   Choose the output file path for the merged XML and DAT files.
+    -   Click "Merge Lists" and select multiple XML files.
+    -   The app will remove duplicates and generate both a merged `.xml` and a binary `.dat` (MessagePack).
 3.  **Copy ROMs/Images**:
-    -   Click the "Copy Roms" or "Copy Images" button.
-    -   Select the source directory containing the ROMs or images.
-    -   Select the destination directory to copy the files to.
-    -   Choose the XML file(s) containing ROM or image information.
+    -   Select your source collection and a destination folder.
+    -   Provide the XML list(s) that define which games you want to "pick" from your full set.
 
-### Prerequisites
+## Prerequisites
 
-- Windows 7 or later.
-- .NET 9.0 Runtime.
-- MAME ROMs and images you wish to manage.
-- The MAME full driver information in XML format (available from the official [MAME](https://www.mamedev.org/release.html) website).
+-   **Operating System**: Windows 10 or later (Windows 7/8 supported with appropriate runtimes).
+-   **Runtime**: [.NET 10.0 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+-   **Data**: MAME ROMs, images, and the MAME full driver information in XML format (generated via `mame -listxml > mame.xml`).
+
+## Technical Details
+
+-   **Framework**: .NET 10 (WPF)
+-   **Serialization**: [MessagePack for C#](https://github.com/neuecc/MessagePack-CSharp) for high-speed binary data handling.
+-   **Architecture**: Service-based architecture with a centralized Service Locator for logging, dialogs, and processing.
+-   **IO**: Asynchronous streaming XML readers/writers to handle multi-gigabyte files without memory exhaustion.
 
 ## License
 
-This project is licensed under the terms of the [GNU General Public License v3.0](LICENSE.txt). See `LICENSE.txt` for more information.
+This project is licensed under the terms of the [GNU General Public License v3.0](LICENSE.txt).
 
 ## Support
 
-If you like the software, please give us a star.  Consider [donating](https://www.purelogiccode.com/donate) to support the project or simply to express your gratitude!
+If you find this utility helpful, please give the repository a ⭐.  
+Consider [donating](https://www.purelogiccode.com/donate) to support further development!
 
 ## Developer
 
-- **Peterson Fernandes** – [Github Profile](https://github.com/drpetersonfernandes)
+- **Peterson Fernandes** – [Github Profile](https://github.com/drpetersonfernandes) – [PureLogicCode](https://www.purelogiccode.com)
