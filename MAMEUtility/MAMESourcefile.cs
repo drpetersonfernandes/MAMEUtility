@@ -1,126 +1,138 @@
-﻿using System.Collections.Concurrent;
 using System.IO;
-using System.Xml.Linq;
+using System.Xml;
 using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameSourcefile
 {
-    public static async Task CreateAndSaveMameSourcefileAsync(XDocument inputDoc, string outputFolderMameSourcefile, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
+    public static async Task CreateAndSaveMameSourcefileAsync(string inputFilePath, string outputFolderMameSourcefile, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
     {
-        logService.Log($"Output folder for MAME Sourcefile: {outputFolderMameSourcefile}");
+        logService.Log($"Processing source files from: {inputFilePath}");
+        logService.Log($"Output folder: {outputFolderMameSourcefile}");
 
         try
         {
-            progress.Report(5);
+            // First pass: collect unique source files
+            var sourceFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
 
-            logService.Log("Extracting source files from XML...");
-            var sourceFiles = await Task.Run(() =>
-                inputDoc.Descendants("machine")
-                    .Select(static m => (string?)m.Attribute("sourcefile"))
-                    .Distinct()
-                    .Where(static s => !string.IsNullOrEmpty(s))
-                    .ToList(), cancellationToken);
-
-            progress.Report(10);
-
-            var totalSourceFiles = sourceFiles.Count;
-            logService.Log($"Found {totalSourceFiles} unique source files to process.");
-
-            // Thread-safe collections for parallel processing
-            var sourcefileDocs = new ConcurrentDictionary<string, XDocument>(StringComparer.OrdinalIgnoreCase);
-            var generatedFileNames = new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-            var processedCount = 0;
-
-            var logInterval = Math.Max(1, totalSourceFiles / 10);
-
-            // Parallel processing of source files
-            logService.Log("Processing source files in parallel...");
-
-            await Task.Run(() =>
+            await using (var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read))
             {
-                Parallel.ForEach(sourceFiles, new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount,
-                    CancellationToken = cancellationToken
-                }, sourceFile =>
-                {
-                    if (string.IsNullOrWhiteSpace(sourceFile)) return;
+                var totalBytes = fileStream.Length;
+                var lastReportedProgress = -1;
+                long processedCount = 0;
 
+                using var reader = XmlReader.Create(fileStream, readerSettings);
+                while (await reader.ReadAsync())
+                {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    try
+                    if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                     {
-                        // Use the new FileNameHelper for robust sanitization of the actual filename
-                        var safeSourceFileName = FileNameHelper.SanitizeForFileName(Path.GetFileNameWithoutExtension(sourceFile));
+                        var sourceFile = reader.GetAttribute("sourcefile") ?? "";
 
-                        var uniqueSafeName = safeSourceFileName;
-                        var counter = 1;
-                        while (!generatedFileNames.TryAdd(uniqueSafeName, true))
+                        if (!string.IsNullOrWhiteSpace(sourceFile))
                         {
-                            uniqueSafeName = $"{safeSourceFileName}_{counter++}";
+                            sourceFiles.Add(sourceFile);
                         }
 
-                        // Create the filtered document
-                        XDocument filteredDoc = new(
-                            new XElement("Machines",
-                                from machine in inputDoc.Descendants("machine")
-                                where (string?)machine.Attribute("sourcefile") == sourceFile
-                                select new XElement("Machine",
-                                    new XElement("MachineName", FileNameHelper.SanitizeForFileName(machine.Attribute("name")?.Value ?? "", "")), // Sanitize for name, not file
-                                    new XElement("Description", FileNameHelper.SanitizeForXmlValue(machine.Element("description")?.Value ?? ""))
-                                )
-                            )
-                        );
-
-                        sourcefileDocs[uniqueSafeName] = filteredDoc;
-
-                        var currentCount = Interlocked.Increment(ref processedCount);
-
-                        if (currentCount % logInterval == 0 || currentCount == totalSourceFiles)
+                        processedCount++;
+                        if (processedCount % 10000 == 0)
                         {
-                            logService.Log($"Processing progress: {currentCount}/{totalSourceFiles} source files");
-                            var progressPercentage = 10 + (int)((double)currentCount / totalSourceFiles * 70);
-                            progress.Report(progressPercentage);
+                            logService.Log($"Scanned {processedCount} machines for source files...");
                         }
                     }
-                    catch (Exception ex)
+
+                    if (totalBytes > 0)
                     {
-                        logService.LogError($"Failed to process sourcefile '{sourceFile}': {ex.Message}");
-                        _ = logService.LogExceptionAsync(ex, $"Error processing sourcefile '{sourceFile}'");
+                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 25);
+                        if (currentProgress > lastReportedProgress)
+                        {
+                            progress.Report(currentProgress);
+                            lastReportedProgress = currentProgress;
+                        }
                     }
-                });
-            }, cancellationToken);
+                }
+            }
 
-            progress.Report(80);
+            progress.Report(25);
+            logService.Log($"Found {sourceFiles.Count} unique source files. Processing each...");
 
-            // Save all collected documents to disk
-            logService.Log("Saving sourcefile XML files...");
-            var savedCount = 0;
-            var totalToSave = sourcefileDocs.Count;
+            // Second pass: for each source file, stream through file and write matches
+            var totalSourceFiles = sourceFiles.Count;
+            var sourceFilesSavedCount = 0;
+            var generatedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
 
-            foreach (var (uniqueSafeName, filteredDoc) in sourcefileDocs)
+            foreach (var sourceFile in sourceFiles)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                var baseSafeName = FileNameHelper.SanitizeForFileName(Path.GetFileNameWithoutExtension(sourceFile));
+                var uniqueSafeName = baseSafeName;
+                var counter = 1;
+                while (generatedFileNames.Contains(uniqueSafeName))
+                {
+                    uniqueSafeName = $"{baseSafeName}_{counter++}";
+                }
+
+                generatedFileNames.Add(uniqueSafeName);
+
                 var outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{uniqueSafeName}.xml");
 
-                try
+                await using (var writer = XmlWriter.Create(outputFilePath, writerSettings))
                 {
-                    await Task.Run(() => filteredDoc.Save(outputFilePath), cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logService.LogError($"Failed to save file for sourcefile '{uniqueSafeName}': {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Error saving sourcefile document for '{uniqueSafeName}'");
+                    await writer.WriteStartDocumentAsync();
+                    await writer.WriteStartElementAsync(null, "Machines", null);
+
+                    // Stream through input file and write matching machines
+                    await using var readStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
+                    using var readReader = XmlReader.Create(readStream, readerSettings);
+
+                    while (await readReader.ReadAsync())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (readReader is { NodeType: XmlNodeType.Element, Name: "machine" })
+                        {
+                            var name = readReader.GetAttribute("name") ?? "";
+                            var machineSourceFile = readReader.GetAttribute("sourcefile") ?? "";
+                            string? description = null;
+
+                            using (var subReader = readReader.ReadSubtree())
+                            {
+                                while (await subReader.ReadAsync())
+                                {
+                                    if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                                    {
+                                        description = await subReader.ReadElementContentAsStringAsync();
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (string.Equals(machineSourceFile, sourceFile, StringComparison.OrdinalIgnoreCase))
+                            {
+                                await writer.WriteStartElementAsync(null, "Machine", null);
+                                await writer.WriteElementStringAsync(null, "MachineName", null, name);
+                                await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
+                                await writer.WriteEndElementAsync();
+                            }
+                        }
+                    }
+
+                    await writer.WriteEndElementAsync();
+                    await writer.WriteEndDocumentAsync();
                 }
 
-                savedCount++;
-                if (savedCount % 10 == 0 || savedCount == totalToSave)
+                sourceFilesSavedCount++;
+                var currentProgress = 25 + (int)((double)sourceFilesSavedCount / totalSourceFiles * 75);
+                progress.Report(currentProgress);
+
+                if (sourceFilesSavedCount % 10 == 0 || sourceFilesSavedCount == totalSourceFiles)
                 {
-                    var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
-                    progress.Report(saveProgress);
+                    logService.Log($"Saved {sourceFilesSavedCount}/{totalSourceFiles} source file XMLs.");
                 }
             }
 
@@ -129,7 +141,6 @@ public static class MameSourcefile
         }
         catch (Exception ex)
         {
-            logService.LogError("An error occurred: " + ex.Message);
             await logService.LogExceptionAsync(ex, "Error in method MAMESourcefile.CreateAndSaveMameSourcefileAsync");
             throw;
         }

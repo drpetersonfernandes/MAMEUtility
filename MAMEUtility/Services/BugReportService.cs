@@ -1,5 +1,7 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using MAMEUtility.Interfaces;
@@ -20,8 +22,9 @@ public class BugReportService(string apiUrl, string apiKey, string applicationNa
             var message = FormatExceptionMessage(exception);
             await SendReportAsync(message);
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"Failed to send bug report: {ex.Message}");
             // Silently fail if we can't send the bug report,
             // We don't want errors in the error reporting to cause more issues
         }
@@ -41,13 +44,14 @@ public class BugReportService(string apiUrl, string apiKey, string applicationNa
             var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
 
             _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Add("X-API-KEY", _apiKey);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
             var response = await _httpClient.PostAsync(_apiUrl, stringContent);
             response.EnsureSuccessStatusCode();
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"Error in SendReportAsync: {ex.Message}");
             // Silently fail if sending fails
         }
     }

@@ -74,6 +74,27 @@ public static partial class FileNameHelper
         return input;
     }
 
+    /// <summary>
+    /// Compares two file paths for equality, taking into account different path separators and case-sensitivity.
+    /// </summary>
+    public static bool ArePathsEqual(string path1, string path2)
+    {
+        if (string.IsNullOrEmpty(path1) || string.IsNullOrEmpty(path2))
+            return false;
+
+        try
+        {
+            var fullPath1 = Path.GetFullPath(path1).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var fullPath2 = Path.GetFullPath(path2).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            return string.Equals(fullPath1, fullPath2, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     [GeneratedRegex(@"\s+")]
     private static partial Regex MyRegex();
 }

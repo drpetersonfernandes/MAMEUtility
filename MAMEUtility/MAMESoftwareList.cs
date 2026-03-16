@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.IO;
+using System.Xml;
 using System.Xml.Linq;
 using MAMEUtility.Interfaces;
 
@@ -14,8 +15,8 @@ public static class MameSoftwareList
             if (!Directory.Exists(inputFolderPath))
             {
                 logService.LogError($"The specified folder does not exist: {inputFolderPath}. Operation cancelled.");
-                progress.Report(0); // Ensure progress is reset or stays at 0
-                return; // Gracefully exit instead of throwing
+                progress.Report(0);
+                return;
             }
 
             progress.Report(5);
@@ -24,84 +25,79 @@ public static class MameSoftwareList
             if (files.Length == 0)
             {
                 logService.LogWarning($"No XML files found in the specified folder: {inputFolderPath}. Operation cancelled.");
-                progress.Report(100); // Consider it "completed" as nothing to process
-                return; // Gracefully exit instead of throwing
+                progress.Report(100);
+                return;
             }
 
             logService.Log($"Found {files.Length} XML files to process.");
 
-            // Thread-safe collection for parallel processing
             var allSoftware = new ConcurrentBag<XElement>();
             var processedCount = 0;
             var totalFiles = files.Length;
 
             var logInterval = Math.Max(1, totalFiles / 10);
 
-            // Parallel processing of XML files
             logService.Log("Processing XML files in parallel...");
 
-            await Task.Run(() =>
+            // Process files asynchronously instead of blocking inside Parallel.ForEach
+            var tasks = files.Select(async file =>
             {
-                Parallel.ForEach(files, new ParallelOptions
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
                 {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount,
-                    CancellationToken = cancellationToken
-                }, file =>
+                    await using var fileStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+                    var doc = await XDocument.LoadAsync(fileStream, LoadOptions.None, cancellationToken);
+
+                    var softwares = doc.Descendants("software")
+                        .Select(static software => new XElement("Software",
+                            new XElement("SoftwareName", software.Attribute("name")?.Value),
+                            new XElement("Description", software.Element("description")?.Value ?? "No Description")));
+
+                    foreach (var software in softwares)
+                    {
+                        allSoftware.Add(software);
+                    }
+
+                    var currentCount = Interlocked.Increment(ref processedCount);
+
+                    if (currentCount % logInterval == 0 || currentCount == totalFiles)
+                    {
+                        logService.Log($"Processing progress: {currentCount}/{totalFiles} files processed");
+                        var progressPercentage = 10 + (int)((double)currentCount / totalFiles * 80);
+                        progress.Report(progressPercentage);
+                    }
+                }
+                catch (Exception ex)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    logService.LogWarning($"Skipping file '{file}' due to an error: {ex.Message}");
+                    _ = logService.LogExceptionAsync(ex, $"Skipping file '{file}' due to an error");
+                }
+            });
 
-                    try
-                    {
-                        var doc = XDocument.Load(file);
-
-                        var softwares = doc.Descendants("software")
-                            .Select(static software => new XElement("Software",
-                                new XElement("SoftwareName", software.Attribute("name")?.Value),
-                                new XElement("Description", software.Element("description")?.Value ?? "No Description")))
-                            .ToList();
-
-                        foreach (var software in softwares)
-                        {
-                            allSoftware.Add(software);
-                        }
-
-                        var currentCount = Interlocked.Increment(ref processedCount);
-
-                        if (currentCount % logInterval == 0 || currentCount == totalFiles) // Changed to == for final log
-                        {
-                            logService.Log($"Processing progress: {currentCount}/{totalFiles} files processed");
-                            var progressPercentage = 10 + (int)((double)currentCount / totalFiles * 80);
-                            progress.Report(progressPercentage);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logService.LogWarning($"Skipping file '{file}' due to an error: {ex.Message}");
-                        _ = logService.LogExceptionAsync(ex, $"Skipping file '{file}' due to an error");
-                    }
-                });
-            }, cancellationToken);
+            await Task.WhenAll(tasks);
 
             progress.Report(90);
 
-            // Create and save the consolidated XML
             logService.Log("Creating consolidated XML file...");
             var softwareList = allSoftware.ToList();
             var outputDoc = new XDocument(new XElement("Softwares", softwareList));
 
-            await Task.Run(() => outputDoc.Save(outputFilePath), cancellationToken);
+            await using (var writerStream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+            await using (var xmlWriter = XmlWriter.Create(writerStream, new XmlWriterSettings { Async = true, Indent = true }))
+            {
+                await outputDoc.WriteToAsync(xmlWriter, cancellationToken);
+            }
 
             progress.Report(100);
             logService.Log($"Consolidated XML file saved with {softwareList.Count} software entries to: {outputFilePath}");
         }
         catch (OperationCanceledException)
         {
-            // Re-throw OperationCanceledException to be handled by the caller (MainWindow)
             throw;
         }
         catch (Exception ex)
         {
-            // Only log and re-throw for unexpected exceptions
             await logService.LogExceptionAsync(ex, "Error in method CreateAndSaveSoftwareListAsync");
             throw;
         }

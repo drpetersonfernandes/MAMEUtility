@@ -13,6 +13,8 @@ public partial class MainWindow
     private readonly ILogService _logService;
     private readonly IDialogService _dialogService;
     private readonly IMameProcessingService _mameProcessingService;
+    private readonly IApplicationStatsService _appStatsService;
+    private readonly IVersionCheckService _versionCheckService;
     private readonly DispatcherTimer _processingTimer;
     private readonly Stopwatch _processingStopwatch;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -26,6 +28,8 @@ public partial class MainWindow
         _logService = serviceLocator.Resolve<ILogService>();
         _dialogService = serviceLocator.Resolve<IDialogService>();
         _mameProcessingService = serviceLocator.Resolve<IMameProcessingService>();
+        _appStatsService = serviceLocator.Resolve<IApplicationStatsService>();
+        _versionCheckService = serviceLocator.Resolve<IVersionCheckService>();
 
         // Initialize timer for processing time
         _processingTimer = new DispatcherTimer
@@ -36,7 +40,80 @@ public partial class MainWindow
 
         _processingStopwatch = new Stopwatch();
 
+        // Subscribe to log messages
+        _logService.LogMessageAdded += LogService_LogMessageAdded;
+
+        Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
+    }
+
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await HandleStartupServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            _ = _logService.LogExceptionAsync(ex, "Error in MainWindow_Loaded");
+        }
+    }
+
+    private async Task HandleStartupServicesAsync()
+    {
+        // 1. Call application stats API
+        _ = _appStatsService.SendStartStatsAsync();
+
+        // 2. Check for updates
+        var (isNewVersionAvailable, latestVersion, downloadUrl) = await _versionCheckService.CheckForUpdatesAsync();
+        if (isNewVersionAvailable && !string.IsNullOrEmpty(latestVersion) && !string.IsNullOrEmpty(downloadUrl))
+        {
+            _logService.Log($"A new version is available: {latestVersion}");
+
+            var result = MessageBox.Show(
+                $"A new version ({latestVersion}) of MAME Utility is available.\nWould you like to visit the download page?",
+                "Update Available",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = downloadUrl,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError($"Failed to open download URL: {ex.Message}");
+                }
+            }
+        }
+        else
+        {
+            _logService.Log("You are using the latest version.");
+        }
+    }
+
+    private void LogService_LogMessageAdded(object? sender, string message)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            LogViewer.AppendText(message);
+            LogViewer.ScrollToEnd();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                LogViewer.AppendText(message);
+                LogViewer.ScrollToEnd();
+            });
+        }
     }
 
     private static void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -48,13 +125,21 @@ public partial class MainWindow
 
     private void ProcessingTimer_Tick(object? sender, EventArgs e)
     {
-        ElapsedTimeTextBlock.Text = $"Elapsed: {_processingStopwatch.Elapsed:mm\\:ss}";
+        UpdateProgressText();
+    }
+
+    private void UpdateProgressText()
+    {
+        var elapsed = _processingStopwatch.Elapsed;
+        var progress = OverallProgressBar.Value;
+        ProgressPercentageTextBlock.Text = $"{progress:0}% | Elapsed: {elapsed:mm\\:ss}";
     }
 
     private void SetProcessingState(bool isProcessing, string? operationName = null)
     {
-        ProcessingOverlay.Visibility = isProcessing ? Visibility.Visible : Visibility.Collapsed;
         StatusBarText.Text = isProcessing ? $"{operationName} in progress..." : "Ready";
+        CancelProcessingButton.Visibility = isProcessing ? Visibility.Visible : Visibility.Collapsed;
+        OverallProgressBar.IsIndeterminate = isProcessing && OverallProgressBar.Value <= 0;
 
         if (isProcessing)
         {
@@ -68,6 +153,8 @@ public partial class MainWindow
         }
         else
         {
+            ProcessingTextBlock.Text = "Ready";
+            ProgressPercentageTextBlock.Text = OverallProgressBar.Value >= 100 ? "Completed | " + $"Elapsed: {_processingStopwatch.Elapsed:mm\\:ss}" : "Ready";
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
             _processingStopwatch.Stop();
@@ -79,7 +166,7 @@ public partial class MainWindow
         {
             CreateMameFullButton, CreateMameManufacturerButton, CreateMameYearButton,
             CreateMameSourcefileButton, CreateMameSoftwareListButton, MergeListsButton,
-            CopyRomsButton, CopyImagesButton
+            StartCopyRomsButton, StartCopyImagesButton
         };
 
         foreach (var button in buttons)
@@ -89,21 +176,8 @@ public partial class MainWindow
 
         if (isProcessing)
         {
-            _cancellationTokenSource = new CancellationTokenSource();
-
-            _processingStopwatch.Reset();
-            _processingStopwatch.Start();
-            _processingTimer.Start();
-            ElapsedTimeTextBlock.Text = "Elapsed: 00:00";
             OverallProgressBar.Value = 0;
-        }
-        else
-        {
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
-
-            _processingStopwatch.Stop();
-            _processingTimer.Stop();
+            UpdateProgressText();
         }
     }
 
@@ -139,6 +213,12 @@ public partial class MainWindow
                 if (string.IsNullOrEmpty(outputFilePath))
                 {
                     _logService.Log("No output file specified for MAMEFull.xml. Operation cancelled.");
+                    return;
+                }
+
+                if (FileNameHelper.ArePathsEqual(inputFilePath, outputFilePath))
+                {
+                    _logService.LogError("Input and output files cannot be the same. Please choose a different name or location for the output file.");
                     return;
                 }
 
@@ -448,45 +528,25 @@ public partial class MainWindow
         }
     }
 
-    private async void CopyRoms_Click(object sender, RoutedEventArgs e)
+    private async void StartCopyRoms_Click(object sender, RoutedEventArgs e)
     {
         try
         {
+            var sourceDirectory = CopyRomsSourceTextBox.Text;
+            var destinationDirectory = CopyRomsDestTextBox.Text;
+            var xmlFilePaths = CopyRomsXmlTextBox.Text.Split('|', StringSplitOptions.RemoveEmptyEntries);
+
+            if (string.IsNullOrWhiteSpace(sourceDirectory) || string.IsNullOrWhiteSpace(destinationDirectory) || xmlFilePaths.Length == 0)
+            {
+                _dialogService.ShowError("Please specify Source, Destination and XML files.");
+                return;
+            }
+
             SetProcessingState(true, "ROM Copy");
 
             if (_cancellationTokenSource != null)
             {
-                var token = _cancellationTokenSource.Token; // Add this line
-
-                _logService.Log("Select the source directory containing the ROMs.");
-                var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the ROMs");
-
-                if (string.IsNullOrEmpty(sourceDirectory))
-                {
-                    _logService.Log("You did not provide the source directory containing the ROMs. Operation cancelled.");
-                    return;
-                }
-
-                _logService.Log("Select the destination directory for the ROMs.");
-                var destinationDirectory = _dialogService.ShowFolderBrowserDialog("Select the destination directory for the ROMs");
-
-                if (string.IsNullOrEmpty(destinationDirectory))
-                {
-                    _logService.Log("You did not select a destination directory for the ROMs. Operation cancelled.");
-                    return;
-                }
-
-                _logService.Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
-                var xmlFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Please select the XML file(s) containing ROM information",
-                    "XML Files (*.xml)|*.xml",
-                    true);
-
-                if (xmlFilePaths == null || xmlFilePaths.Length == 0)
-                {
-                    _logService.Log("You did not provide the XML file(s) containing ROM information. Operation cancelled.");
-                    return;
-                }
+                var token = _cancellationTokenSource.Token;
 
                 var progress = new Progress<int>(value =>
                 {
@@ -504,7 +564,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CopyRoms");
+            await _logService.LogExceptionAsync(ex, "Error in StartCopyRoms");
         }
         finally
         {
@@ -512,45 +572,25 @@ public partial class MainWindow
         }
     }
 
-    private async void CopyImages_Click(object sender, RoutedEventArgs e)
+    private async void StartCopyImages_Click(object sender, RoutedEventArgs e)
     {
         try
         {
+            var sourceDirectory = CopyImagesSourceTextBox.Text;
+            var destinationDirectory = CopyImagesDestTextBox.Text;
+            var xmlFilePaths = CopyImagesXmlTextBox.Text.Split('|', StringSplitOptions.RemoveEmptyEntries);
+
+            if (string.IsNullOrWhiteSpace(sourceDirectory) || string.IsNullOrWhiteSpace(destinationDirectory) || xmlFilePaths.Length == 0)
+            {
+                _dialogService.ShowError("Please specify Source, Destination and XML files.");
+                return;
+            }
+
             SetProcessingState(true, "Image Copy");
 
             if (_cancellationTokenSource != null)
             {
                 var token = _cancellationTokenSource.Token;
-
-                _logService.Log("Select the source directory containing the images.");
-                var sourceDirectory = _dialogService.ShowFolderBrowserDialog("Select the source directory containing the images");
-
-                if (string.IsNullOrEmpty(sourceDirectory))
-                {
-                    _logService.Log("No source directory selected. Operation cancelled.");
-                    return;
-                }
-
-                _logService.Log("Select the destination directory for the images.");
-                var destinationDirectory = _dialogService.ShowFolderBrowserDialog("Select the destination directory for the images");
-
-                if (string.IsNullOrEmpty(destinationDirectory))
-                {
-                    _logService.Log("No destination directory selected. Operation cancelled.");
-                    return;
-                }
-
-                _logService.Log("Please select the XML file(s) containing ROM information. You can select multiple XML files.");
-                var xmlFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Please select the XML file(s) containing ROM information",
-                    "XML Files (*.xml)|*.xml",
-                    true);
-
-                if (xmlFilePaths == null || xmlFilePaths.Length == 0)
-                {
-                    _logService.Log("No XML files selected. Operation cancelled.");
-                    return;
-                }
 
                 var progress = new Progress<int>(value =>
                 {
@@ -568,7 +608,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CopyImages");
+            await _logService.LogExceptionAsync(ex, "Error in StartCopyImages");
         }
         finally
         {
@@ -599,15 +639,68 @@ public partial class MainWindow
         _dialogService.ShowAboutWindow();
     }
 
-    private void ShowLog_Click(object sender, RoutedEventArgs e)
-    {
-        _logService.ShowLogWindow();
-    }
-
     private void Exit_Click(object sender, RoutedEventArgs e)
     {
         Application.Current.Shutdown();
     }
+
+    #region Browse Handlers
+
+    private void BrowseCopyRomsSource_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = _dialogService.ShowFolderBrowserDialog("Select Source ROMs Directory");
+        if (!string.IsNullOrEmpty(folder))
+        {
+            CopyRomsSourceTextBox.Text = folder;
+        }
+    }
+
+    private void BrowseCopyRomsDest_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = _dialogService.ShowFolderBrowserDialog("Select Destination ROMs Directory");
+        if (!string.IsNullOrEmpty(folder))
+        {
+            CopyRomsDestTextBox.Text = folder;
+        }
+    }
+
+    private void BrowseCopyRomsXml_Click(object sender, RoutedEventArgs e)
+    {
+        var files = _dialogService.ShowOpenFileDialog("Select XML Selection File(s)", "XML files (*.xml)|*.xml", true);
+        if (files is { Length: > 0 })
+        {
+            CopyRomsXmlTextBox.Text = string.Join("|", files);
+        }
+    }
+
+    private void BrowseCopyImagesSource_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = _dialogService.ShowFolderBrowserDialog("Select Source Images Directory");
+        if (!string.IsNullOrEmpty(folder))
+        {
+            CopyImagesSourceTextBox.Text = folder;
+        }
+    }
+
+    private void BrowseCopyImagesDest_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = _dialogService.ShowFolderBrowserDialog("Select Destination Images Directory");
+        if (!string.IsNullOrEmpty(folder))
+        {
+            CopyImagesDestTextBox.Text = folder;
+        }
+    }
+
+    private void BrowseCopyImagesXml_Click(object sender, RoutedEventArgs e)
+    {
+        var files = _dialogService.ShowOpenFileDialog("Select XML Selection File(s)", "XML files (*.xml)|*.xml", true);
+        if (files is { Length: > 0 })
+        {
+            CopyImagesXmlTextBox.Text = string.Join("|", files);
+        }
+    }
+
+    #endregion
 
     private void CancelProcessingButton_Click(object sender, RoutedEventArgs e)
     {

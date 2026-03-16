@@ -38,6 +38,14 @@ public class ServiceLocator
         // MameProcessingService
         var mameProcessingService = new MameProcessingService(logService);
         Register<IMameProcessingService>(mameProcessingService);
+
+        // ApplicationStatsService
+        var appStatsService = new ApplicationStatsService(appConfig.BugReportApiKey);
+        Register<IApplicationStatsService>(appStatsService);
+
+        // VersionCheckService
+        var versionCheckService = new GitHubVersionService();
+        Register<IVersionCheckService>(versionCheckService);
     }
 
     private void Register<T>(T service) where T : class

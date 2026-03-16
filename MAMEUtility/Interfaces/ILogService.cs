@@ -12,5 +12,8 @@ public interface ILogService
 
     void ShowLogWindow();
 
+    void BeginBatchOperation();
+    void EndBatchOperation(string summaryTitle = "Batch Operation Completed");
+
     event EventHandler<string> LogMessageAdded;
 }

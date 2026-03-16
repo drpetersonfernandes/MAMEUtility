@@ -30,12 +30,17 @@ public partial class AboutWindow
     /// <summary>
     /// Gets the application version
     /// </summary>
-    public static string ApplicationVersion
+    public static string ApplicationVersion => "Version: " + RawVersion;
+
+    /// <summary>
+    /// Gets the raw application version string
+    /// </summary>
+    public static string RawVersion
     {
         get
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version;
-            return "Version: " + (version?.ToString() ?? "Unknown");
+            return version?.ToString() ?? "0.0.0.0";
         }
     }
 

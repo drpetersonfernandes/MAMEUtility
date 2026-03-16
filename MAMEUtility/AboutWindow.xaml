@@ -1,73 +1,57 @@
-﻿<Window
+<Window
     x:Class="MAMEUtility.AboutWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="About MAME Utility"
-    Width="400"
-    Height="400"
-    Background="#F5F5F5"
+    Width="450"
+    Height="550"
     ResizeMode="NoResize"
-    WindowStartupLocation="CenterOwner"
+    WindowStartupLocation="CenterScreen"
+    Background="{StaticResource WindowBackgroundBrush}"
     mc:Ignorable="d">
 
-    <Border Margin="10" BorderBrush="#DDDDDD" BorderThickness="1" CornerRadius="8" Background="White">
-        <Grid Margin="15">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <!-- Logo -->
-            <StackPanel
-                Grid.Row="0"
-                Margin="0,10,0,20"
-                HorizontalAlignment="Center"
-                Orientation="Horizontal">
-                <Image
-                    Width="150"
-                    Height="150"
-                    Source="pack://application:,,,/images/logo.png" />
+        <!-- Logo Section -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15" Padding="15">
+            <StackPanel HorizontalAlignment="Center">
+                <Image Width="130" Height="130" Source="pack://application:,,,/images/logo.png" />
             </StackPanel>
+        </Border>
 
-            <!-- App info -->
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center">
-                <TextBlock 
-                    FontSize="24" 
-                    FontWeight="Bold" 
-                    Text="MAME Utility" 
-                    HorizontalAlignment="Center"/>
-                <TextBlock 
-                    x:Name="VersionTextBlock"
-                    Margin="0,10,0,0" 
-                    FontSize="14"
-                    HorizontalAlignment="Center"/>
+        <!-- Title & Version Section -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15" Padding="15">
+            <StackPanel>
+                <TextBlock FontWeight="Bold" FontSize="20" Foreground="{StaticResource HeaderTextBrush}" Text="MAME Utility" HorizontalAlignment="Center" />
+                <TextBlock x:Name="VersionTextBlock" Margin="0,8,0,0" Text="" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryAccentBrush}" FontWeight="SemiBold" FontSize="14" />
             </StackPanel>
+        </Border>
 
-            <!-- Website and copyright -->
-            <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock HorizontalAlignment="Center">
-                    <Hyperlink 
-                        NavigateUri="https://www.purelogiccode.com"
-                        RequestNavigate="Hyperlink_RequestNavigate">
+        <!-- Description Section -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,15" Padding="15">
+            <StackPanel>
+                <TextBlock FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" Text="Description" Margin="0,0,0,10" />
+                <TextBlock TextWrapping="Wrap" Text="A utility for managing MAME ROM lists, merging XML files, and organizing ROM and image collections." Foreground="{StaticResource TextSecondaryBrush}" LineHeight="20" />
+                <TextBlock Margin="0,15,0,0">
+                    <Hyperlink NavigateUri="https://www.purelogiccode.com" RequestNavigate="Hyperlink_RequestNavigate">
                         https://www.purelogiccode.com
                     </Hyperlink>
                 </TextBlock>
             </StackPanel>
+        </Border>
 
-            <!-- Close button -->
-            <Button
-                Grid.Row="3"
-                Width="120"
-                Height="35"
-                Margin="0,15,0,0"
-                HorizontalAlignment="Center"
-                Click="CloseButton_Click"
-                Content="Close"
-                Style="{StaticResource DefaultButtonStyle}" />
-        </Grid>
-    </Border>
+        <!-- Close Button Section -->
+        <StackPanel Grid.Row="4" HorizontalAlignment="Center">
+            <Button Click="CloseButton_Click" Content="Close" Style="{StaticResource ActionButtonStyle}" Width="100" ToolTip="Close the About window" />
+        </StackPanel>
+    </Grid>
 </Window>

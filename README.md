@@ -5,6 +5,8 @@
 MAME Utility is a high-performance Windows tool designed to manage, organize, and filter MAME (Multiple Arcade Machine Emulator) data. It allows users to generate specialized XML lists, merge databases into optimized formats, and manage ROM/image collections with ease.
 
 ![Screenshot](screenshot1.png)
+![Screenshot](screenshot2.png)
+![Screenshot](screenshot3.png)
 
 ## Features
 

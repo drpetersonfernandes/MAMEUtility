@@ -1,118 +1,147 @@
-﻿using System.Collections.Concurrent;
 using System.IO;
-using System.Xml.Linq;
+using System.Xml;
 using MAMEUtility.Interfaces;
 
 namespace MAMEUtility;
 
 public static class MameYear
 {
-    public static async Task CreateAndSaveMameYearAsync(XDocument inputDoc, string outputFolderMameYear, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
+    public static async Task CreateAndSaveMameYearAsync(string inputFilePath, string outputFolderMameYear, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
     {
-        logService.Log($"Output folder for MAME Year: {outputFolderMameYear}");
+        logService.Log($"Processing years from: {inputFilePath}");
+        logService.Log($"Output folder: {outputFolderMameYear}");
 
         try
         {
-            progress.Report(5);
+            // First pass: collect unique years
+            var years = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
 
-            logService.Log("Extracting years from XML...");
-            var years = await Task.Run(() =>
-                inputDoc.Descendants("machine")
-                    .Select(static m => (string?)m.Element("year"))
-                    .Distinct()
-                    .Where(static y => !string.IsNullOrEmpty(y))
-                    .ToList(), cancellationToken);
-
-            progress.Report(10);
-
-            var totalYears = years.Count;
-            logService.Log($"Found {totalYears} unique years to process.");
-
-            // Thread-safe collection for parallel processing
-            var yearDocs = new ConcurrentDictionary<string, XDocument>(StringComparer.OrdinalIgnoreCase);
-            var processedCount = 0;
-
-            var logInterval = Math.Max(1, totalYears / 10);
-
-            // Parallel processing of years
-            logService.Log("Processing years in parallel...");
-
-            await Task.Run(() =>
+            await using (var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read))
             {
-                Parallel.ForEach(years, new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount,
-                    CancellationToken = cancellationToken
-                }, year =>
-                {
-                    if (year == null) return;
+                var totalBytes = fileStream.Length;
+                var lastReportedProgress = -1;
+                long processedCount = 0;
 
+                using var reader = XmlReader.Create(fileStream, readerSettings);
+                while (await reader.ReadAsync())
+                {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    try
+                    if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                     {
-                        var machinesForYear = inputDoc.Descendants("machine")
-                            .Where(m => (string?)m.Element("year") == year)
-                            .ToList();
+                        string? year = null;
+                        using (var subReader = reader.ReadSubtree())
+                        {
+                            while (await subReader.ReadAsync())
+                            {
+                                if (subReader is { NodeType: XmlNodeType.Element, Name: "year" })
+                                {
+                                    year = await subReader.ReadElementContentAsStringAsync();
+                                    break;
+                                }
+                            }
+                        }
 
-                        XDocument yearDoc = new(
-                            new XElement("Machines",
-                                from machine in machinesForYear
-                                select new XElement("Machine",
-                                    new XElement("MachineName", machine.Attribute("name")?.Value ?? ""),
-                                    new XElement("Description", machine.Element("description")?.Value ?? "")
-                                )
-                            )
-                        );
+                        if (!string.IsNullOrWhiteSpace(year))
+                        {
+                            years.Add(year);
+                        }
 
-                        // Use a safe key (replace '?' with 'X')
-                        var safeYear = year.Replace("?", "X");
-                        yearDocs[safeYear] = yearDoc;
-
-                        var currentCount = Interlocked.Increment(ref processedCount);
-
-                        if (currentCount % logInterval != 0 && currentCount != totalYears) return;
-
-                        logService.Log($"Processing progress: {currentCount}/{totalYears} years");
-                        var progressPercentage = 10 + (int)((double)currentCount / totalYears * 70);
-                        progress.Report(progressPercentage);
+                        processedCount++;
+                        if (processedCount % 10000 == 0)
+                        {
+                            logService.Log($"Scanned {processedCount} machines for years...");
+                        }
                     }
-                    catch (Exception ex)
+
+                    if (totalBytes > 0)
                     {
-                        logService.LogError($"Failed to process year '{year}': {ex.Message}");
-                        _ = logService.LogExceptionAsync(ex, $"Error processing year '{year}'");
+                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 25);
+                        if (currentProgress > lastReportedProgress)
+                        {
+                            progress.Report(currentProgress);
+                            lastReportedProgress = currentProgress;
+                        }
                     }
-                });
-            }, cancellationToken);
+                }
+            }
 
-            progress.Report(80);
+            progress.Report(25);
+            logService.Log($"Found {years.Count} unique years. Processing each...");
 
-            // Save all collected documents to disk
-            logService.Log("Saving year XML files...");
-            var savedCount = 0;
-            var totalToSave = yearDocs.Count;
+            // Second pass: for each year, stream through file and write matches
+            var totalYears = years.Count;
+            var yearsSaved = 0;
+            var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
 
-            foreach (var (safeYear, yearDoc) in yearDocs)
+            foreach (var year in years)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                var safeYear = year.Replace("?", "X");
                 var outputFilePath = Path.Combine(outputFolderMameYear, $"{safeYear}.xml");
 
-                try
+                await using (var writer = XmlWriter.Create(outputFilePath, writerSettings))
                 {
-                    await Task.Run(() => yearDoc.Save(outputFilePath), cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logService.LogError($"Failed to save file for year '{safeYear}': {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Error saving year document for '{safeYear}'");
+                    await writer.WriteStartDocumentAsync();
+                    await writer.WriteStartElementAsync(null, "Machines", null);
+
+                    // Stream through input file and write matching machines
+                    await using var readStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
+                    using var readReader = XmlReader.Create(readStream, readerSettings);
+
+                    while (await readReader.ReadAsync())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (readReader is { NodeType: XmlNodeType.Element, Name: "machine" })
+                        {
+                            var name = readReader.GetAttribute("name") ?? "";
+                            string? machineYear = null;
+                            string? description = null;
+
+                            using (var subReader = readReader.ReadSubtree())
+                            {
+                                while (await subReader.ReadAsync())
+                                {
+                                    if (subReader.NodeType == XmlNodeType.Element)
+                                    {
+                                        switch (subReader.Name)
+                                        {
+                                            case "year":
+                                                machineYear = await subReader.ReadElementContentAsStringAsync();
+                                                break;
+                                            case "description":
+                                                description = await subReader.ReadElementContentAsStringAsync();
+                                                break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (string.Equals(machineYear, year, StringComparison.OrdinalIgnoreCase))
+                            {
+                                await writer.WriteStartElementAsync(null, "Machine", null);
+                                await writer.WriteElementStringAsync(null, "MachineName", null, name);
+                                await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
+                                await writer.WriteEndElementAsync();
+                            }
+                        }
+                    }
+
+                    await writer.WriteEndElementAsync();
+                    await writer.WriteEndDocumentAsync();
                 }
 
-                savedCount++;
-                if (savedCount % 10 != 0 && savedCount != totalToSave) continue;
+                yearsSaved++;
+                var currentProgress = 25 + (int)((double)yearsSaved / totalYears * 75);
+                progress.Report(currentProgress);
 
-                var saveProgress = 80 + (int)((double)savedCount / totalToSave * 20);
-                progress.Report(saveProgress);
+                if (yearsSaved % 10 == 0 || yearsSaved == totalYears)
+                {
+                    logService.Log($"Saved {yearsSaved}/{totalYears} year files.");
+                }
             }
 
             progress.Report(100);
@@ -120,7 +149,6 @@ public static class MameYear
         }
         catch (Exception ex)
         {
-            logService.LogError("An error occurred: " + ex.Message);
             await logService.LogExceptionAsync(ex, "Error in method MAMEYear.CreateAndSaveMameYearAsync");
             throw;
         }

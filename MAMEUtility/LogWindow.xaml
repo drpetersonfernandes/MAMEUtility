@@ -5,11 +5,13 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="MAME Utility Log" 
-    Height="450" 
-    Width="600"
+    Height="600" 
+    Width="800"
+    Background="{StaticResource WindowBackgroundBrush}"
+    WindowStartupLocation="CenterScreen"
     mc:Ignorable="d">
     
-    <Grid Margin="10">
+    <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -17,51 +19,59 @@
         </Grid.RowDefinitions>
         
         <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock 
-                Grid.Column="0"
-                Text="Application Log" 
-                FontSize="18" 
-                FontWeight="Bold" 
-                VerticalAlignment="Center" />
-            
-            <StackPanel 
-                Grid.Column="1" 
-                Orientation="Horizontal">
+        <Border Grid.Row="0" Background="{StaticResource HeaderBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="15" Margin="0,0,0,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock 
+                    Grid.Column="0"
+                    Text="Application Log" 
+                    FontSize="18" 
+                    FontWeight="Bold" 
+                    Foreground="{StaticResource HeaderTextBrush}"
+                    VerticalAlignment="Center" />
+                
                 <Button 
+                    Grid.Column="1"
                     Content="Clear Log" 
                     Click="ClearButton_Click"
-                    Style="{StaticResource DefaultButtonStyle}" />
-            </StackPanel>
-        </Grid>
+                    Style="{StaticResource ActionButtonStyle}" />
+            </Grid>
+        </Border>
         
         <!-- Log content -->
         <Border 
             Grid.Row="1" 
-            BorderBrush="#CCCCCC" 
-            BorderThickness="1" 
-            CornerRadius="3">
+            BorderBrush="{StaticResource TerminalBorderBrush}" 
+            BorderThickness="2" 
+            CornerRadius="4" 
+            Background="{StaticResource TerminalBackgroundBrush}">
             <TextBox 
                 Name="LogTextBox" 
                 IsReadOnly="True" 
                 VerticalScrollBarVisibility="Auto" 
                 HorizontalScrollBarVisibility="Auto" 
-                TextWrapping="Wrap"
+                TextWrapping="NoWrap"
                 FontFamily="Consolas"
-                FontSize="12"
-                Padding="5"
-                Background="#FAFAFA" />
+                FontSize="13"
+                Padding="10"
+                Background="{StaticResource TerminalBackgroundBrush}"
+                Foreground="{StaticResource TerminalForegroundBrush}"
+                BorderThickness="0"
+                CaretBrush="{StaticResource TerminalForegroundBrush}">
+                <TextBox.Effect>
+                    <DropShadowEffect ShadowDepth="0" Color="#39FF14" BlurRadius="2" Opacity="0.4"/>
+                </TextBox.Effect>
+            </TextBox>
         </Border>
         
         <!-- Status bar -->
-        <StatusBar Grid.Row="2" Height="25" Margin="0,10,0,0" Background="#F0F0F0">
+        <StatusBar Grid.Row="2" Background="{StaticResource StatusBarBackgroundBrush}" Margin="0,15,0,0" Padding="5">
             <StatusBarItem>
-                <TextBlock Text="Ready" />
+                <TextBlock Text="Ready" Foreground="{StaticResource TextSecondaryBrush}" />
             </StatusBarItem>
         </StatusBar>
     </Grid>

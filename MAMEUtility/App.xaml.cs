@@ -21,8 +21,8 @@ public partial class App : IDisposable
             // Get the log service
             _logService = serviceLocator.Resolve<ILogService>();
 
-            // Initialize LogWindow
-            _logService.ShowLogWindow();
+            // Log that application has started
+            _logService.Log("Application started.");
         }
         catch (Exception ex)
         {

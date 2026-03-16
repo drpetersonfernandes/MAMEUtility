@@ -1,5 +1,5 @@
-﻿using System.IO;
-using System.Xml.Linq;
+using System.IO;
+using System.Xml;
 using MAMEUtility.Interfaces;
 using MAMEUtility.Models;
 using MessagePack;
@@ -13,22 +13,21 @@ public static class MergeList
         if (inputFilePaths.Length == 0)
         {
             logService.LogWarning("No input files provided. Operation cancelled.");
-            progress.Report(100); // Indicate completion for no-op
+            progress.Report(100);
             return;
         }
 
         logService.Log($"Starting merge operation with {inputFilePaths.Length} files.");
-        progress.Report(0); // Initial progress
+        progress.Report(0);
 
-        // Use a dictionary to store unique machines by MachineName (case-insensitive)
-        // This automatically handles duplicates by keeping the first encountered entry.
         var uniqueMachines = new Dictionary<string, MachineInfo>(StringComparer.OrdinalIgnoreCase);
-        var filesProcessed = 0;
+        var filesProcessedCount = 0;
         var totalFiles = inputFilePaths.Length;
 
-        const int logInterval = 5;
-        const double xmlProcessingWeight = 80.0; // Percentage of progress for XML processing
-        const double savingWeight = 20.0; // Percentage of progress for saving
+        const double xmlProcessingWeight = 80.0;
+        const double savingWeight = 20.0;
+
+        var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
 
         foreach (var inputFilePath in inputFilePaths)
         {
@@ -36,63 +35,66 @@ public static class MergeList
 
             try
             {
-                var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
+                await using var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
+                using var reader = XmlReader.Create(fileStream, readerSettings);
 
-                int currentProgress;
-                if (!IsValidAndNormalizeStructure(inputDoc, out var normalizedRoot))
+                while (await reader.ReadAsync())
                 {
-                    logService.LogWarning($"The file {Path.GetFileName(inputFilePath)} does not have the correct XML structure and will be skipped.");
-                    // Still increment filesProcessed to ensure overall progress calculation is accurate
-                    filesProcessed++;
-                    currentProgress = (int)((double)filesProcessed / totalFiles * xmlProcessingWeight);
-                    progress.Report(currentProgress);
-                    continue;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                if (normalizedRoot != null)
-                {
-                    foreach (var machineElement in normalizedRoot.Elements("Machine"))
+                    if (reader.NodeType != XmlNodeType.Element) continue;
+
+                    if (reader.Name is "Machine" or "Software")
                     {
-                        var machineName = machineElement.Element("MachineName")?.Value;
-                        if (!string.IsNullOrEmpty(machineName))
+                        string? machineName = null;
+                        string? description = null;
+
+                        using (var subReader = reader.ReadSubtree())
                         {
-                            // Add if not already present. If duplicate, the existing one is kept.
-                            if (!uniqueMachines.ContainsKey(machineName))
+                            while (await subReader.ReadAsync())
                             {
-                                var machine = new MachineInfo
+                                if (subReader.NodeType == XmlNodeType.Element)
                                 {
-                                    MachineName = machineName,
-                                    Description = machineElement.Element("Description")?.Value ?? string.Empty
-                                };
-                                uniqueMachines.Add(machineName, machine);
+                                    switch (subReader.Name)
+                                    {
+                                        case "MachineName":
+                                        case "SoftwareName":
+                                            machineName = await subReader.ReadElementContentAsStringAsync();
+                                            break;
+                                        case "Description":
+                                            description = await subReader.ReadElementContentAsStringAsync();
+                                            break;
+                                    }
+                                }
                             }
-                            else
+                        }
+
+                        if (!string.IsNullOrEmpty(machineName) && !uniqueMachines.ContainsKey(machineName))
+                        {
+                            uniqueMachines.Add(machineName, new MachineInfo
                             {
-                                // Optionally log that a duplicate was skipped
-                                // logService.Log($"Skipping duplicate machine entry: {machineName} from {Path.GetFileName(inputFilePath)}");
-                            }
+                                MachineName = machineName,
+                                Description = description ?? string.Empty
+                            });
                         }
                     }
                 }
 
-                filesProcessed++;
-
-                // Report progress for XML processing phase
-                currentProgress = (int)((double)filesProcessed / totalFiles * xmlProcessingWeight);
+                filesProcessedCount++;
+                var currentProgress = (int)((double)filesProcessedCount / totalFiles * xmlProcessingWeight);
                 progress.Report(currentProgress);
 
-                if (filesProcessed % logInterval == 0 || filesProcessed == totalFiles)
+                if (filesProcessedCount % 5 == 0 || filesProcessedCount == totalFiles)
                 {
-                    logService.Log($"Processed {filesProcessed} of {totalFiles} files.");
+                    logService.Log($"Processed {filesProcessedCount} of {totalFiles} files.");
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logService.LogError($"Error processing file {Path.GetFileName(inputFilePath)}: {ex.Message}");
                 await logService.LogExceptionAsync(ex, $"Error processing file {inputFilePath}");
-                // Increment filesProcessed even on error to ensure progress bar eventually completes
-                filesProcessed++;
-                var currentProgress = (int)((double)filesProcessed / totalFiles * xmlProcessingWeight);
+                filesProcessedCount++;
+                var currentProgress = (int)((double)filesProcessedCount / totalFiles * xmlProcessingWeight);
                 progress.Report(currentProgress);
             }
         }
@@ -100,33 +102,42 @@ public static class MergeList
         if (uniqueMachines.Count == 0)
         {
             logService.LogWarning("No valid data found in input files after merging. Operation cancelled.");
-            progress.Report(100); // Indicate completion for no-op
+            progress.Report(100);
             return;
         }
-
-        // Create the final merged XDocument from unique machines
-        XDocument mergedDoc = new(new XElement("Machines",
-            uniqueMachines.Values.Select(static m => new XElement("Machine",
-                new XElement("MachineName", m.MachineName),
-                new XElement("Description", m.Description)
-            ))
-        ));
 
         try
         {
             logService.Log($"Saving merged XML file with {uniqueMachines.Count} unique entries...");
             cancellationToken.ThrowIfCancellationRequested();
-            await Task.Run(() => mergedDoc.Save(xmlOutputPath), cancellationToken);
+
+            var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
+            await using (var writer = XmlWriter.Create(xmlOutputPath, writerSettings))
+            {
+                await writer.WriteStartDocumentAsync();
+                await writer.WriteStartElementAsync(null, "Machines", null);
+
+                foreach (var machine in uniqueMachines.Values)
+                {
+                    await writer.WriteStartElementAsync(null, "Machine", null);
+                    await writer.WriteElementStringAsync(null, "MachineName", null, machine.MachineName);
+                    await writer.WriteElementStringAsync(null, "Description", null, machine.Description);
+                    await writer.WriteEndElementAsync();
+                }
+
+                await writer.WriteEndElementAsync();
+                await writer.WriteEndDocumentAsync();
+            }
+
             logService.Log($"Merged XML saved successfully to: {xmlOutputPath}");
-            // Report progress after XML save, before DAT save
             progress.Report((int)xmlProcessingWeight + (int)(savingWeight * 0.5));
 
             logService.Log("Converting to MessagePack format...");
-            var machinesList = uniqueMachines.Values.ToList(); // Convert dictionary values to list
+            var machinesList = uniqueMachines.Values.ToList();
             cancellationToken.ThrowIfCancellationRequested();
             await SaveMachinesToDatAsync(machinesList, datOutputPath, logService, cancellationToken);
             logService.Log($"Merged DAT file saved successfully to: {datOutputPath}");
-            progress.Report(100); // Final 100%
+            progress.Report(100);
         }
         catch (Exception ex)
         {
@@ -136,54 +147,12 @@ public static class MergeList
         }
     }
 
-    private static bool IsValidAndNormalizeStructure(XDocument doc, out XElement? normalizedRoot)
-    {
-        normalizedRoot = null;
-
-        if (doc.Root == null)
-        {
-            return false;
-        }
-
-        switch (doc.Root.Name.LocalName)
-        {
-            case "Machines" when doc.Root.Elements("Machine").Any():
-                normalizedRoot = doc.Root;
-                return true;
-            case "Softwares" when doc.Root.Elements("Software").Any():
-            {
-                normalizedRoot = new XElement("Machines");
-                foreach (var software in doc.Root.Elements("Software"))
-                {
-                    var machineElement = new XElement("Machine");
-                    var softwareName = software.Element("SoftwareName")?.Value;
-                    if (!string.IsNullOrEmpty(softwareName))
-                    {
-                        machineElement.Add(new XElement("MachineName", softwareName));
-                    }
-
-                    var description = software.Element("Description");
-                    if (description != null)
-                    {
-                        machineElement.Add(new XElement("Description", description.Value));
-                    }
-
-                    normalizedRoot.Add(machineElement);
-                }
-
-                return normalizedRoot.Elements().Any();
-            }
-            default:
-                return false;
-        }
-    }
-
     private static async Task SaveMachinesToDatAsync(List<MachineInfo> machines, string outputFilePath, ILogService logService, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var binary = await Task.Run(() => MessagePackSerializer.Serialize(machines), cancellationToken);
+            var binary = await Task.Run(() => MessagePackSerializer.Serialize(machines, cancellationToken: cancellationToken), cancellationToken);
             await File.WriteAllBytesAsync(outputFilePath, binary, cancellationToken);
         }
         catch (Exception ex)

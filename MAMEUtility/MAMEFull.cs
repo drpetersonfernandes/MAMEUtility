@@ -1,3 +1,4 @@
+using System.IO;
 using System.Xml;
 using MAMEUtility.Interfaces;
 
@@ -14,58 +15,112 @@ public static class MameFull
     {
         logService.Log($"Output file for MAME Full: {outputFilePathMameFull}");
 
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
-            var settings = new XmlReaderSettings
+            var tempFilePath = outputFilePathMameFull + ".tmp";
+            try
             {
-                DtdProcessing = DtdProcessing.Ignore,
-                IgnoreWhitespace = true
-            };
-
-            using var reader = XmlReader.Create(inputFilePath, settings);
-            using var writer = XmlWriter.Create(outputFilePathMameFull, new XmlWriterSettings { Indent = true });
-
-            writer.WriteStartDocument();
-            writer.WriteStartElement("Machines");
-
-            long processed = 0;
-            const int logInterval = 5000;
-
-            while (reader.Read())
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
+                var readerSettings = new XmlReaderSettings
                 {
-                    var name = reader.GetAttribute("name");
-                    using var subReader = reader.ReadSubtree();
-                    string? description = null;
+                    DtdProcessing = DtdProcessing.Ignore,
+                    IgnoreWhitespace = true,
+                    Async = true
+                };
 
-                    while (subReader.Read())
+                var writerSettings = new XmlWriterSettings
+                {
+                    Indent = true,
+                    Async = true
+                };
+
+                await using var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
+                var totalBytes = fileStream.Length;
+                var lastReportedProgress = -1;
+
+                using var reader = XmlReader.Create(fileStream, readerSettings);
+                await using var writer = XmlWriter.Create(tempFilePath, writerSettings);
+
+                await writer.WriteStartDocumentAsync();
+                await writer.WriteStartElementAsync(null, "Machines", null);
+
+                long processed = 0;
+                const int logInterval = 5000;
+
+                while (await reader.ReadAsync())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                     {
-                        if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                        var name = reader.GetAttribute("name");
+                        using var subReader = reader.ReadSubtree();
+                        string? description = null;
+
+                        while (await subReader.ReadAsync())
                         {
-                            description = subReader.ReadElementContentAsString();
-                            break;
+                            if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                            {
+                                description = await subReader.ReadElementContentAsStringAsync();
+                                break;
+                            }
                         }
+
+                        await writer.WriteStartElementAsync(null, "Machine", null);
+                        await writer.WriteElementStringAsync(null, "MachineName", null, name ?? string.Empty);
+                        await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
+                        await writer.WriteEndElementAsync();
+
+                        processed++;
+                        if (processed % logInterval == 0)
+                            logService.Log($"Progress: {processed} machines processed...");
                     }
 
-                    writer.WriteStartElement("Machine");
-                    writer.WriteElementString("MachineName", name);
-                    writer.WriteElementString("Description", description ?? "");
-                    writer.WriteEndElement();
-
-                    processed++;
-                    if (processed % logInterval == 0)
-                        logService.Log($"Progress: {processed} machines processed...");
+                    // Report progress based on stream position
+                    if (totalBytes > 0)
+                    {
+                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 99);
+                        if (currentProgress > lastReportedProgress)
+                        {
+                            progress.Report(currentProgress);
+                            lastReportedProgress = currentProgress;
+                        }
+                    }
                 }
+
+                await writer.WriteEndElementAsync();
+                await writer.WriteEndDocumentAsync();
+
+                // After closing the files, move the temporary file to the final destination
+                if (File.Exists(outputFilePathMameFull))
+                {
+                    File.Delete(outputFilePathMameFull);
+                }
+
+                File.Move(tempFilePath, outputFilePathMameFull);
+
+                progress.Report(100);
+                logService.Log("MAME Full XML file created successfully.");
             }
+            catch (Exception ex)
+            {
+                // Log and report the error
+                await logService.LogExceptionAsync(ex, "Error in CreateAndSaveMameFullAsync");
 
-            writer.WriteEndElement();
-            writer.WriteEndDocument();
+                // Clean up temp file on failure
+                if (File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        /* Ignore cleanup errors */
+                    }
+                }
 
-            progress.Report(100);
-            logService.Log("MAME Full XML file created successfully.");
+                throw;
+            }
         }, cancellationToken);
     }
 }

@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using MAMEUtility.Interfaces;
 
 namespace MAMEUtility.Services;
@@ -51,8 +50,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
-            await MameYear.CreateAndSaveMameYearAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
+            await MameYear.CreateAndSaveMameYearAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -65,8 +63,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
     {
         try
         {
-            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
-            await MameSourcefile.CreateAndSaveMameSourcefileAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
+            await MameSourcefile.CreateAndSaveMameSourcefileAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
         }
         catch (Exception ex)
         {
