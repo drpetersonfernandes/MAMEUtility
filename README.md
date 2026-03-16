@@ -62,9 +62,11 @@ Whether you're curating a custom arcade cabinet setup, organizing ROMs by manufa
 
 ## 📸 Screenshots
 
-[Screenshot 1](screenshot1.png)
-[Screenshot 2](screenshot2.png)
-[Screenshot 3](screenshot3.png)
+![Screenshot 1](screenshot1.png)
+
+![Screenshot 2](screenshot2.png)
+
+![Screenshot 3](screenshot3.png)
 
 ---
 
