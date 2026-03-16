@@ -100,12 +100,10 @@ public static class MameSourcefile
             var savedCount = 0;
             var totalToSave = sourcefileDocs.Count;
 
-            foreach (var kvp in sourcefileDocs)
+            foreach (var (uniqueSafeName, filteredDoc) in sourcefileDocs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var uniqueSafeName = kvp.Key;
-                var filteredDoc = kvp.Value;
                 var outputFilePath = Path.Combine(outputFolderMameSourcefile, $"{uniqueSafeName}.xml");
 
                 try

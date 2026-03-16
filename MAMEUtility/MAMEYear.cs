@@ -92,12 +92,10 @@ public static class MameYear
             var savedCount = 0;
             var totalToSave = yearDocs.Count;
 
-            foreach (var kvp in yearDocs)
+            foreach (var (safeYear, yearDoc) in yearDocs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var safeYear = kvp.Key;
-                var yearDoc = kvp.Value;
                 var outputFilePath = Path.Combine(outputFolderMameYear, $"{safeYear}.xml");
 
                 try
