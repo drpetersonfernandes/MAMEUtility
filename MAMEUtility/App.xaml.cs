@@ -74,7 +74,7 @@ public partial class App : IDisposable
 
             if (_logService != null)
             {
-                _ = _logService.LogExceptionAsync(exception, context);
+                _logService.LogExceptionAsyncFireAndForget(exception, context);
             }
             else
             {

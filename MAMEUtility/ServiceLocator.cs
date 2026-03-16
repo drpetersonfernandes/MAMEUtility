@@ -5,10 +5,10 @@ namespace MAMEUtility;
 
 public class ServiceLocator
 {
-    private static ServiceLocator? _instance;
+    private static readonly Lazy<ServiceLocator> Instance2 = new(static () => new ServiceLocator());
     private readonly Dictionary<Type, object> _services = new();
 
-    public static ServiceLocator Instance => _instance ??= new ServiceLocator();
+    public static ServiceLocator Instance => Instance2.Value;
 
     private ServiceLocator()
     {

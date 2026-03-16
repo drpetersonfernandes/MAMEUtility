@@ -82,7 +82,8 @@ public static class CopyRoms
                     logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
                     await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
                     filesProcessed++;
-                    progress.Report((int)((double)filesProcessed / totalFiles * 100));
+                    var progressPercentage = Math.Min(100, (int)((double)filesProcessed / totalFiles * 100));
+                    progress.Report(progressPercentage);
                 }
             }
         }

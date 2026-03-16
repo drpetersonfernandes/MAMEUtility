@@ -52,6 +52,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await MameYear.CreateAndSaveMameYearAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
         }
+        catch (System.Xml.XmlException ex)
+        {
+            await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
+            throw;
+        }
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error processing year data from file: {inputFilePath}");
@@ -65,6 +70,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await MameSourcefile.CreateAndSaveMameSourcefileAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
         }
+        catch (System.Xml.XmlException ex)
+        {
+            await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
+            throw;
+        }
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error processing sourcefile data from file: {inputFilePath}");
@@ -77,6 +87,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         try
         {
             await MameSoftwareList.CreateAndSaveSoftwareListAsync(inputFolderPath, outputFilePath, progress, _logService, cancellationToken);
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
+            throw;
         }
         catch (Exception ex)
         {

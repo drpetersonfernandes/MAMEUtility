@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using Application = System.Windows.Application;
 using System.Windows.Threading;
 using MAMEUtility.Interfaces;
 
@@ -55,7 +54,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _ = _logService.LogExceptionAsync(ex, "Error in MainWindow_Loaded");
+            _logService.LogExceptionAsyncFireAndForget(ex, "Error in MainWindow_Loaded");
         }
     }
 
@@ -116,9 +115,10 @@ public partial class MainWindow
         }
     }
 
-    private static void MainWindow_Closing(object? sender, CancelEventArgs e)
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
-        Application.Current.Shutdown();
+        // Unsubscribe from event to prevent memory leak
+        _logService.LogMessageAdded -= LogService_LogMessageAdded;
     }
 
     public static string VersionText => AboutWindow.ApplicationVersion;
@@ -181,6 +181,19 @@ public partial class MainWindow
         }
     }
 
+    private void CancelProcessingButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _cancellationTokenSource?.Cancel();
+            _logService.Log("Cancellation requested by user...");
+        }
+        catch (Exception ex)
+        {
+            _logService.LogError($"Error cancelling operation: {ex.Message}");
+        }
+    }
+
     private async void CreateMameFull_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -228,9 +241,8 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress, token);
+                _logService.Log("Output file saved.");
             }
-
-            _logService.Log("Output file saved.");
         }
         catch (OperationCanceledException)
         {
@@ -284,9 +296,8 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress, token);
+                _logService.Log("Data extracted and saved successfully for all manufacturers.");
             }
-
-            _logService.Log("Data extracted and saved successfully for all manufacturers.");
         }
         catch (OperationCanceledException)
         {
@@ -340,9 +351,8 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress, token);
+                _logService.Log("XML files created successfully for all years.");
             }
-
-            _logService.Log("XML files created successfully for all years.");
         }
         catch (OperationCanceledException)
         {
@@ -396,9 +406,8 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress, token);
+                _logService.Log("Data extracted and saved successfully for all source files.");
             }
-
-            _logService.Log("Data extracted and saved successfully for all source files.");
         }
         catch (OperationCanceledException)
         {
@@ -451,9 +460,8 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress, token);
+                _logService.Log("Consolidated XML file created successfully.");
             }
-
-            _logService.Log("Consolidated XML file created successfully.");
         }
         catch (OperationCanceledException)
         {
@@ -630,7 +638,7 @@ public partial class MainWindow
         catch (Exception ex)
         {
             _dialogService.ShowError("Unable to open the link: " + ex.Message);
-            _ = _logService.LogExceptionAsync(ex, "Error in Donate");
+            _logService.LogExceptionAsyncFireAndForget(ex, "Error in Donate");
         }
     }
 
@@ -701,17 +709,4 @@ public partial class MainWindow
     }
 
     #endregion
-
-    private void CancelProcessingButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            _cancellationTokenSource?.Cancel();
-            _logService.Log("Operation cancellation requested by user");
-        }
-        catch (Exception ex)
-        {
-            _logService.LogError($"Failed to cancel operation: {ex.Message}");
-        }
-    }
 }

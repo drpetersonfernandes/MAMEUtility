@@ -10,6 +10,8 @@ public interface ILogService
 
     Task LogExceptionAsync(Exception exception, string additionalInfo = "");
 
+    void LogExceptionAsyncFireAndForget(Exception exception, string additionalInfo = "");
+
     void ShowLogWindow();
 
     void BeginBatchOperation();

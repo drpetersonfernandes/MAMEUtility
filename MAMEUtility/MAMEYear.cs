@@ -43,7 +43,7 @@ public static class MameYear
                             }
                         }
 
-                        if (!string.IsNullOrWhiteSpace(year))
+                        if (!string.IsNullOrWhiteSpace(year) && IsValidYear(year))
                         {
                             years.Add(year);
                         }
@@ -152,5 +152,22 @@ public static class MameYear
             await logService.LogExceptionAsync(ex, "Error in method MAMEYear.CreateAndSaveMameYearAsync");
             throw;
         }
+    }
+
+    private static bool IsValidYear(string year)
+    {
+        // Allow 4-digit years (e.g., "1980", "1995", "2000")
+        // Also allow years with ? for unknown digits (e.g., "198?", "19??")
+        if (string.IsNullOrWhiteSpace(year) || year.Length != 4)
+            return false;
+
+        // Check if it's all digits or contains only digits and ?
+        foreach (var c in year)
+        {
+            if (!char.IsDigit(c) && c != '?')
+                return false;
+        }
+
+        return true;
     }
 }

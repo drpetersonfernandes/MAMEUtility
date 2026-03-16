@@ -71,7 +71,7 @@ public static class MameSoftwareList
                 catch (Exception ex)
                 {
                     logService.LogWarning($"Skipping file '{file}' due to an error: {ex.Message}");
-                    _ = logService.LogExceptionAsync(ex, $"Skipping file '{file}' due to an error");
+                    logService.LogExceptionAsyncFireAndForget(ex, $"Skipping file '{file}' due to an error");
                 }
             });
 

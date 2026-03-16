@@ -17,7 +17,7 @@ public static class MameFull
 
         return Task.Run(async () =>
         {
-            var tempFilePath = outputFilePathMameFull + ".tmp";
+            var tempFilePath = Path.Combine(Path.GetTempPath(), $"MameFull_{Guid.NewGuid()}.tmp");
             try
             {
                 var readerSettings = new XmlReaderSettings

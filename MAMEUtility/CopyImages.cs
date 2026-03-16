@@ -54,7 +54,8 @@ public static class CopyImages
                     var currentFileIndex = filesProcessedCount;
                     var fileProgress = new Progress<int>(percent =>
                     {
-                        var weightedPercentage = (currentFileIndex + percent / 100.0) / totalFiles * 100.0;
+                        var clampedPercent = Math.Max(0, Math.Min(100, percent));
+                        var weightedPercentage = (currentFileIndex + clampedPercent / 100.0) / totalFiles * 100.0;
                         progress.Report((int)weightedPercentage);
                     });
 
@@ -81,7 +82,8 @@ public static class CopyImages
                     logService.LogError($"An error occurred processing {Path.GetFileName(xmlFilePath)}: {ex.Message}");
                     await logService.LogExceptionAsync(ex, $"An error occurred processing {Path.GetFileName(xmlFilePath)}");
                     filesProcessedCount++;
-                    progress.Report((int)((double)filesProcessedCount / totalFiles * 100));
+                    var progressPercentage = Math.Min(100, (int)((double)filesProcessedCount / totalFiles * 100));
+                    progress.Report(progressPercentage);
                 }
             }
         }
@@ -160,7 +162,15 @@ public static class CopyImages
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
+                try
+                {
+                    ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
+                }
+                catch (Exception ex)
+                {
+                    logService.LogError($"Error processing images for {machineName}: {ex.Message}");
+                    await logService.LogExceptionAsync(ex, $"Error processing images for {machineName}");
+                }
 
                 machinesProcessedCount++;
 
@@ -207,7 +217,7 @@ public static class CopyImages
         }
         else
         {
-            logService.Log($"Source image file not found: {sourceFile}");
+            logService.LogWarning($"Source image file not found: {sourceFile}");
         }
     }
 }

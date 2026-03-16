@@ -41,7 +41,7 @@ public class BugReportService(string apiUrl, string apiKey, string applicationNa
             };
 
             var json = JsonSerializer.Serialize(content);
-            var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
+            using var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
 
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);

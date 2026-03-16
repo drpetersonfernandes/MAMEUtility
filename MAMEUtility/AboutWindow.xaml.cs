@@ -53,6 +53,8 @@ public partial class AboutWindow
     {
         try
         {
+            if (e.Uri == null) return;
+
             using var process = Process.Start(new ProcessStartInfo
             {
                 FileName = e.Uri.AbsoluteUri,

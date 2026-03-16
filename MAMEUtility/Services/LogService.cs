@@ -82,7 +82,7 @@ public class LogService : ILogService, IDisposable
         catch (Exception ex)
         {
             LogErrorInternal($"Failed to show Log Window: {ex.Message}");
-            _ = LogExceptionAsync(ex, "Error in ShowLogWindowInternal");
+            LogExceptionAsyncFireAndForget(ex, "Error in ShowLogWindowInternal");
             MessageBox.Show($"Could not display the log window. Please check the log file for details.\nError: {ex.Message}",
                 "Log Window Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -166,6 +166,24 @@ public class LogService : ILogService, IDisposable
         });
     }
 
+    public void LogExceptionAsyncFireAndForget(Exception exception, string additionalInfo = "")
+    {
+        _ = LogExceptionAsyncFireAndForgetInternal(exception, additionalInfo);
+    }
+
+    private async Task LogExceptionAsyncFireAndForgetInternal(Exception exception, string additionalInfo)
+    {
+        try
+        {
+            await LogExceptionAsync(exception, additionalInfo);
+        }
+        catch (Exception ex)
+        {
+            // Silently fail - we can't log a logging failure
+            Debug.WriteLine($"Failed to log exception: {ex.Message}");
+        }
+    }
+
     public void BeginBatchOperation()
     {
         _isBatchOperation = true;
@@ -236,7 +254,18 @@ public class LogService : ILogService, IDisposable
 
     private async Task LogToFileAsync(string formattedMessage)
     {
-        await _logFileSemaphore.WaitAsync();
+        if (_disposed) return;
+
+        try
+        {
+            await _logFileSemaphore.WaitAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Semaphore was disposed, ignore the log entry
+            return;
+        }
+
         try
         {
             await using var writer = new StreamWriter(_logFilePath, true, Encoding.UTF8);
@@ -248,7 +277,14 @@ public class LogService : ILogService, IDisposable
         }
         finally
         {
-            _logFileSemaphore.Release();
+            try
+            {
+                _logFileSemaphore.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Semaphore was disposed, ignore
+            }
         }
     }
 
