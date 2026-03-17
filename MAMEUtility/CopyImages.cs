@@ -158,33 +158,37 @@ public static class CopyImages
 
             logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting sequential image copy...");
 
-            foreach (var machineName in machineNames)
+            // Offload the synchronous file copy loop to a background thread to prevent UI freezing
+            await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                foreach (var machineName in machineNames)
                 {
-                    ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
-                }
-                catch (Exception ex)
-                {
-                    logService.LogError($"Error processing images for {machineName}: {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Error processing images for {machineName}");
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                machinesProcessedCount++;
+                    try
+                    {
+                        ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
+                    }
+                    catch (Exception ex)
+                    {
+                        logService.LogError($"Error processing images for {machineName}: {ex.Message}");
+                        logService.LogExceptionAsync(ex, $"Error processing images for {machineName}").GetAwaiter().GetResult();
+                    }
 
-                if (machinesProcessedCount % internalLogInterval == 0 || machinesProcessedCount == totalMachines)
-                {
-                    logService.Log($"Image copy progress for {fileName}: {machinesProcessedCount}/{totalMachines} machines processed");
-                }
+                    machinesProcessedCount++;
 
-                if (machinesProcessedCount % internalProgressInterval == 0 || machinesProcessedCount == totalMachines)
-                {
-                    var progressPercentage = (double)machinesProcessedCount / totalMachines * 100;
-                    progress.Report((int)progressPercentage);
+                    if (machinesProcessedCount % internalLogInterval == 0 || machinesProcessedCount == totalMachines)
+                    {
+                        logService.Log($"Image copy progress for {fileName}: {machinesProcessedCount}/{totalMachines} machines processed");
+                    }
+
+                    if (machinesProcessedCount % internalProgressInterval == 0 || machinesProcessedCount == totalMachines)
+                    {
+                        var progressPercentage = (double)machinesProcessedCount / totalMachines * 100;
+                        progress.Report((int)progressPercentage);
+                    }
                 }
-            }
+            }, cancellationToken);
 
             logService.Log($"Completed processing {machinesProcessedCount} machines from {fileName}");
         }

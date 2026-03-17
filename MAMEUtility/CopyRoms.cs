@@ -158,33 +158,37 @@ public static class CopyRoms
 
             logService.Log($"Found {totalRoms} machine entries in {fileName}. Starting sequential copy...");
 
-            foreach (var machineName in machineNames)
+            // Offload the synchronous file copy loop to a background thread to prevent UI freezing
+            await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                foreach (var machineName in machineNames)
                 {
-                    CopyRom(sourceDirectory, destinationDirectory, machineName, logService);
-                }
-                catch (Exception ex)
-                {
-                    logService.LogError($"Error copying ROM for {machineName}: {ex.Message}");
-                    await logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}");
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                romsProcessed++;
+                    try
+                    {
+                        CopyRom(sourceDirectory, destinationDirectory, machineName, logService);
+                    }
+                    catch (Exception ex)
+                    {
+                        logService.LogError($"Error copying ROM for {machineName}: {ex.Message}");
+                        logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}").GetAwaiter().GetResult();
+                    }
 
-                if (romsProcessed % internalLogInterval == 0 || romsProcessed == totalRoms)
-                {
-                    logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
-                }
+                    romsProcessed++;
 
-                if (romsProcessed % internalProgressInterval == 0 || romsProcessed == totalRoms)
-                {
-                    var progressPercentage = (double)romsProcessed / totalRoms * 100;
-                    progress.Report((int)progressPercentage);
+                    if (romsProcessed % internalLogInterval == 0 || romsProcessed == totalRoms)
+                    {
+                        logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
+                    }
+
+                    if (romsProcessed % internalProgressInterval == 0 || romsProcessed == totalRoms)
+                    {
+                        var progressPercentage = (double)romsProcessed / totalRoms * 100;
+                        progress.Report((int)progressPercentage);
+                    }
                 }
-            }
+            }, cancellationToken);
 
             logService.Log($"Completed processing {romsProcessed} ROMs from {fileName}");
         }

@@ -74,7 +74,9 @@ public partial class App : IDisposable
 
             if (_logService != null)
             {
-                _ = _logService.LogExceptionAsync(exception, context);
+                // Synchronously wait for the bug report to be sent before the process terminates.
+                // Using _ = fire-and-forget would lose the report as the app exits too quickly.
+                _logService.LogExceptionAsync(exception, context).GetAwaiter().GetResult();
             }
             else
             {

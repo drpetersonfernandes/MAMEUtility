@@ -21,6 +21,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated. It ended unexpectedly at line {ex.LineNumber}. Please re-download or re-generate the MAME XML file.");
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
+            throw;
+        }
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error processing XML file: {inputFilePath}");
@@ -37,6 +42,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         catch (System.Xml.XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
             throw;
         }
         catch (Exception ex)
@@ -57,6 +67,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
+            throw;
+        }
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error processing year data from file: {inputFilePath}");
@@ -73,6 +88,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         catch (System.Xml.XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
             throw;
         }
         catch (Exception ex)
@@ -93,6 +113,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
+            throw;
+        }
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error creating software list from folder: {inputFolderPath}");
@@ -105,6 +130,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         try
         {
             await MergeList.MergeAndSaveBothAsync(inputFilePaths, xmlOutputPath, datOutputPath, progress, _logService, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
+            throw;
         }
         catch (Exception ex)
         {
@@ -119,6 +149,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await CopyRoms.CopyRomsFromXmlAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, _logService, cancellationToken);
         }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
+            throw;
+        }
         catch (Exception ex)
         {
             await _logService.LogExceptionAsync(ex, $"Error copying ROMs from {sourceDirectory} to {destinationDirectory}");
@@ -131,6 +166,11 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         try
         {
             await CopyImages.CopyImagesFromXmlAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, _logService, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // User-initiated cancellation - don't log as error
+            throw;
         }
         catch (Exception ex)
         {

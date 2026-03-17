@@ -164,12 +164,27 @@ public partial class MainWindow
         {
             CreateMameFullButton, CreateMameManufacturerButton, CreateMameYearButton,
             CreateMameSourcefileButton, CreateMameSoftwareListButton, MergeListsButton,
-            StartCopyRomsButton, StartCopyImagesButton
+            StartCopyRomsButton, StartCopyImagesButton,
+            // Browse buttons
+            BrowseCopyRomsSourceButton, BrowseCopyRomsDestButton, BrowseCopyRomsXmlButton,
+            BrowseCopyImagesSourceButton, BrowseCopyImagesDestButton, BrowseCopyImagesXmlButton
         };
 
         foreach (var button in buttons)
         {
             button.IsEnabled = !isProcessing;
+        }
+
+        // Disable/Enable text boxes to prevent path changes during processing
+        var textBoxes = new[]
+        {
+            CopyRomsSourceTextBox, CopyRomsDestTextBox, CopyRomsXmlTextBox,
+            CopyImagesSourceTextBox, CopyImagesDestTextBox, CopyImagesXmlTextBox
+        };
+
+        foreach (var textBox in textBoxes)
+        {
+            textBox.IsEnabled = !isProcessing;
         }
 
         if (isProcessing)
@@ -235,7 +250,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress, token);
@@ -246,9 +261,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CreateMameFull");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to create MAME Full list. See log for details.");
         }
         finally
         {
@@ -290,7 +306,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress, token);
@@ -301,9 +317,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CreateMameManufacturer");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to create manufacturer lists. See log for details.");
         }
         finally
         {
@@ -345,7 +362,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress, token);
@@ -356,9 +373,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CreateMameYear");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to create year lists. See log for details.");
         }
         finally
         {
@@ -400,7 +418,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress, token);
@@ -411,9 +429,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CreateMameSourcefile");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to create sourcefile lists. See log for details.");
         }
         finally
         {
@@ -454,7 +473,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress, token);
@@ -465,9 +484,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in CreateMameSoftwareList");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to create software list. See log for details.");
         }
         finally
         {
@@ -513,7 +533,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.MergeListsAsync(inputFilePaths, outputXmlPath, outputDatPath, progress, token);
@@ -524,9 +544,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in MergeLists");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to merge lists. See log for details.");
         }
         finally
         {
@@ -556,7 +577,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CopyRomsAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
@@ -568,9 +589,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in StartCopyRoms");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to copy ROMs. See log for details.");
         }
         finally
         {
@@ -600,7 +622,7 @@ public partial class MainWindow
 
                 var progress = new Progress<int>(value =>
                 {
-                    Dispatcher.BeginInvoke(() => OverallProgressBar.Value = value);
+                    OverallProgressBar.Value = value;
                 });
 
                 await _mameProcessingService.CopyImagesAsync(xmlFilePaths, sourceDirectory, destinationDirectory, progress, token);
@@ -612,9 +634,10 @@ public partial class MainWindow
         {
             _logService.Log("Operation was cancelled by user");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            await _logService.LogExceptionAsync(ex, "Error in StartCopyImages");
+            // Exception already logged by MameProcessingService - just show user feedback
+            _logService.LogError("Failed to copy images. See log for details.");
         }
         finally
         {

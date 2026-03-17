@@ -24,10 +24,25 @@ public class ServiceLocator
         var versionService = new VersionService();
         Register<IVersionService>(versionService);
 
-        // AppConfig
+        // Create BugReportService with default config first (needed for AppConfig error reporting)
+        var tempBugReportService = new BugReportService(
+            SharedHttpClient,
+            "https://www.purelogiccode.com/bugreport/api/send-bug-report",
+            "hjh7yu6t56tyr540o9u8767676r5674534453235264c75b6t7ggghgg76trf564e",
+            versionService);
+
+        // Subscribe to AppConfig load errors BEFORE accessing AppConfig.Instance
+        // This ensures errors during config loading are captured
+        AppConfig.ConfigLoadError += (sender, ex) =>
+        {
+            // Fire and forget is acceptable here as this is during startup
+            _ = tempBugReportService.SendExceptionReportAsync(ex);
+        };
+
+        // AppConfig - LoadConfig() runs here via Lazy initialization
         var appConfig = AppConfig.Instance;
 
-        // BugReportService
+        // BugReportService - now with actual config values
         var bugReportService = new BugReportService(
             SharedHttpClient,
             appConfig.BugReportApiUrl,
@@ -54,13 +69,6 @@ public class ServiceLocator
         // VersionCheckService
         var versionCheckService = new GitHubVersionService(SharedHttpClient, versionService);
         Register<IVersionCheckService>(versionCheckService);
-
-        // Subscribe to AppConfig load errors
-        AppConfig.ConfigLoadError += (sender, ex) =>
-        {
-            // Fire and forget is acceptable here as this is during startup
-            _ = bugReportService.SendExceptionReportAsync(ex);
-        };
     }
 
     private void Register<T>(T service) where T : class

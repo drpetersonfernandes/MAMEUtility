@@ -154,15 +154,15 @@
 
                                 <Label Grid.Row="0" Grid.Column="0" Content="Source ROMs Directory:" />
                                 <TextBox Grid.Row="1" Grid.Column="0" x:Name="CopyRomsSourceTextBox" ToolTip="Select the folder containing your source ROM files" />
-                                <Button Grid.Row="1" Grid.Column="1" Content="Browse..." Click="BrowseCopyRomsSource_Click" Style="{StaticResource ActionButtonStyle}" />
+                                <Button Grid.Row="1" Grid.Column="1" x:Name="BrowseCopyRomsSourceButton" Content="Browse..." Click="BrowseCopyRomsSource_Click" Style="{StaticResource ActionButtonStyle}" />
 
                                 <Label Grid.Row="2" Grid.Column="0" Content="Destination Directory:" Margin="0,10,0,0" />
                                 <TextBox Grid.Row="3" Grid.Column="0" x:Name="CopyRomsDestTextBox" ToolTip="Select the folder where ROMs will be copied" />
-                                <Button Grid.Row="3" Grid.Column="1" Content="Browse..." Click="BrowseCopyRomsDest_Click" Style="{StaticResource ActionButtonStyle}" />
+                                <Button Grid.Row="3" Grid.Column="1" x:Name="BrowseCopyRomsDestButton" Content="Browse..." Click="BrowseCopyRomsDest_Click" Style="{StaticResource ActionButtonStyle}" />
 
                                 <Label Grid.Row="4" Grid.Column="0" Content="Selection XML File(s):" Margin="0,10,0,0" />
                                 <TextBox Grid.Row="5" Grid.Column="0" x:Name="CopyRomsXmlTextBox" ToolTip="Select one or more XML files that define which ROMs to copy" />
-                                <Button Grid.Row="5" Grid.Column="1" Content="Browse..." Click="BrowseCopyRomsXml_Click" Style="{StaticResource ActionButtonStyle}" />
+                                <Button Grid.Row="5" Grid.Column="1" x:Name="BrowseCopyRomsXmlButton" Content="Browse..." Click="BrowseCopyRomsXml_Click" Style="{StaticResource ActionButtonStyle}" />
                             </Grid>
                         </GroupBox>
                         
@@ -200,15 +200,15 @@
 
                                 <Label Grid.Row="0" Grid.Column="0" Content="Source Images Directory:" />
                                 <TextBox Grid.Row="1" Grid.Column="0" x:Name="CopyImagesSourceTextBox" ToolTip="Select the folder containing your source image files (png, jpg)" />
-                                <Button Grid.Row="1" Grid.Column="1" Content="Browse..." Click="BrowseCopyImagesSource_Click" Style="{StaticResource ActionButtonStyle}" />
+                                <Button Grid.Row="1" Grid.Column="1" x:Name="BrowseCopyImagesSourceButton" Content="Browse..." Click="BrowseCopyImagesSource_Click" Style="{StaticResource ActionButtonStyle}" />
 
                                 <Label Grid.Row="2" Grid.Column="0" Content="Destination Directory:" Margin="0,10,0,0" />
                                 <TextBox Grid.Row="3" Grid.Column="0" x:Name="CopyImagesDestTextBox" ToolTip="Select the folder where images will be copied" />
-                                <Button Grid.Row="3" Grid.Column="1" Content="Browse..." Click="BrowseCopyImagesDest_Click" Style="{StaticResource ActionButtonStyle}" />
+                                <Button Grid.Row="3" Grid.Column="1" x:Name="BrowseCopyImagesDestButton" Content="Browse..." Click="BrowseCopyImagesDest_Click" Style="{StaticResource ActionButtonStyle}" />
 
                                 <Label Grid.Row="4" Grid.Column="0" Content="Selection XML File(s):" Margin="0,10,0,0" />
                                 <TextBox Grid.Row="5" Grid.Column="0" x:Name="CopyImagesXmlTextBox" ToolTip="Select one or more XML files that define which images to copy" />
-                                <Button Grid.Row="5" Grid.Column="1" Content="Browse..." Click="BrowseCopyImagesXml_Click" Style="{StaticResource ActionButtonStyle}" />
+                                <Button Grid.Row="5" Grid.Column="1" x:Name="BrowseCopyImagesXmlButton" Content="Browse..." Click="BrowseCopyImagesXml_Click" Style="{StaticResource ActionButtonStyle}" />
                             </Grid>
                         </GroupBox>
 

@@ -36,45 +36,49 @@ public static class MameManufacturer
                         if (name.Contains("bios", StringComparison.OrdinalIgnoreCase) || emulation == "preliminary")
                         {
                             reader.Skip();
-                            continue;
+                            // Do NOT use 'continue' here. reader.Skip() positions the reader on the next node.
+                            // The loop's next iteration will call ReadAsync() which would skip the next machine.
                         }
-
-                        string? manufacturer = null;
-                        string? description = null;
-
-                        using (var subReader = reader.ReadSubtree())
+                        else
                         {
-                            while (await subReader.ReadAsync())
-                            {
-                                if (subReader.NodeType == XmlNodeType.Element)
-                                {
-                                    var nodeName = subReader.Name;
-                                    if (string.Equals(nodeName, "manufacturer", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        manufacturer = await subReader.ReadElementContentAsStringAsync();
-                                        continue; // ReadElementContentAsStringAsync already advanced the reader
-                                    }
+                            string? manufacturer = null;
+                            string? description = null;
 
-                                    if (string.Equals(nodeName, "description", StringComparison.OrdinalIgnoreCase))
+                            using (var subReader = reader.ReadSubtree())
+                            {
+                                while (await subReader.ReadAsync())
+                                {
+                                    if (subReader.NodeType == XmlNodeType.Element)
                                     {
-                                        description = await subReader.ReadElementContentAsStringAsync();
+                                        var nodeName = subReader.Name;
+                                        if (string.Equals(nodeName, "manufacturer", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            manufacturer = await subReader.ReadElementContentAsStringAsync();
+                                            continue; // ReadElementContentAsStringAsync already advanced the reader
+                                        }
+
+                                        if (string.Equals(nodeName, "description", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            description = await subReader.ReadElementContentAsStringAsync();
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        if (!string.IsNullOrEmpty(manufacturer) && !string.IsNullOrEmpty(description) && !description.Contains("bios", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (!manufacturerData.TryGetValue(manufacturer, out var machines))
+                            if (!string.IsNullOrEmpty(manufacturer) && !string.IsNullOrEmpty(description) && !description.Contains("bios", StringComparison.OrdinalIgnoreCase))
                             {
-                                machines = new List<(string Name, string Description)>();
-                                manufacturerData[manufacturer] = machines;
+                                if (!manufacturerData.TryGetValue(manufacturer, out var machines))
+                                {
+                                    machines = new List<(string Name, string Description)>();
+                                    manufacturerData[manufacturer] = machines;
+                                }
+
+                                machines.Add((name, description));
                             }
 
-                            machines.Add((name, description));
+                            processedCount++;
                         }
 
-                        processedCount++;
                         if (processedCount % 10000 == 0)
                         {
                             logService.Log($"Scanned {processedCount} machines...");
@@ -99,6 +103,7 @@ public static class MameManufacturer
             var totalManufacturers = manufacturerData.Count;
             var manufacturersSaved = 0;
             var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
+            var generatedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var kvp in manufacturerData)
             {
@@ -106,7 +111,18 @@ public static class MameManufacturer
 
                 var manufacturer = kvp.Key;
                 var machines = kvp.Value;
-                var safeName = FileNameHelper.SanitizeForFileName(manufacturer);
+                var baseSafeName = FileNameHelper.SanitizeForFileName(manufacturer);
+
+                // Handle filename collisions (e.g., "Company A/B" and "Company A\\B" both sanitize to same name)
+                var safeName = baseSafeName;
+                var counter = 1;
+                while (generatedFileNames.Contains(safeName))
+                {
+                    safeName = $"{baseSafeName}_{counter++}";
+                }
+
+                generatedFileNames.Add(safeName);
+
                 var outputFilePath = Path.Combine(outputFolderMameManufacturer, $"{safeName}.xml");
 
                 await using (var writer = XmlWriter.Create(outputFilePath, writerSettings))
