@@ -136,7 +136,7 @@ Whether you're curating a custom arcade cabinet setup, organizing ROMs by manufa
 | **Framework** | .NET 10 (WPF) |
 | **Language** | C# 14 |
 | **UI Framework** | Windows Presentation Foundation (WPF) |
-| **Serialization** | [MessagePack for C#](https://github.com/neuecc/MessagePack-CSharp) |
+| **Serialization** | [MessagePack for C#](https://github.com/neuecc/MessagePack-CSharp) v3.1.4 |
 | **Architecture Pattern** | Service-based with Service Locator |
 
 ### Project Structure
@@ -148,10 +148,22 @@ MAMEUtility/
 │   ├── LogService.cs
 │   ├── DialogService.cs
 │   ├── GitHubVersionService.cs
-│   └── BugReportService.cs
+│   ├── VersionService.cs
+│   ├── BugReportService.cs
+│   └── ApplicationStatsService.cs
 ├── Interfaces/            # Service contracts
+│   ├── IMameProcessingService.cs
+│   ├── ILogService.cs
+│   ├── IDialogService.cs
+│   ├── IVersionCheckService.cs
+│   ├── IVersionService.cs
+│   ├── IBugReportService.cs
+│   └── IApplicationStatsService.cs
 ├── Models/                # Data models
+│   ├── MachineInfo.cs
+│   └── LogLevel.cs
 ├── Converters/            # WPF value converters
+│   └── Converters.cs
 ├── CopyRoms.cs           # ROM batch operations
 ├── CopyImages.cs         # Image batch operations
 ├── MergeList.cs          # XML merging logic
@@ -159,7 +171,13 @@ MAMEUtility/
 ├── MAMEManufacturer.cs   # Manufacturer filtering
 ├── MAMEYear.cs           # Year-based filtering
 ├── MAMESourcefile.cs     # Source file filtering
-└── MAMESoftwareList.cs   # Software list processing
+├── MAMESoftwareList.cs   # Software list processing
+├── FileNameHelper.cs     # File name validation utilities
+├── ServiceLocator.cs     # Dependency resolution
+├── MainWindow.xaml       # Main application window
+├── LogWindow.xaml        # Log viewer window
+├── AboutWindow.xaml      # About dialog
+└── App.xaml              # Application resources and startup
 ```
 
 ---
