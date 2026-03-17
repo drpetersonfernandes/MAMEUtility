@@ -1,91 +1,27 @@
-using System.Diagnostics;
-using System.IO;
 using System.Text;
 using System.Globalization;
-using System.Windows;
 using System.Windows.Threading;
 using MAMEUtility.Interfaces;
 using MAMEUtility.Models;
 using Application = System.Windows.Application;
-using MessageBox = System.Windows.MessageBox;
 
 namespace MAMEUtility.Services;
 
 public class LogService : ILogService, IDisposable
 {
     private readonly IBugReportService _bugReportService;
-    private readonly string _logFilePath;
-    private LogWindow? _logWindow;
     private readonly Dispatcher? _dispatcher;
-    private readonly SemaphoreSlim _logFileSemaphore = new(1, 1);
     private bool _isBatchOperation;
     private bool _errorsOccurredInBatch;
     private bool _warningsOccurredInBatch;
 
     public event EventHandler<string>? LogMessageAdded;
+    public event EventHandler<(string Title, string Message, bool HasErrors)>? BatchOperationCompleted;
 
     public LogService(IBugReportService bugReportService)
     {
         _bugReportService = bugReportService;
-        _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MAMEUtilityLog.txt");
         _dispatcher = Application.Current?.Dispatcher;
-
-        try
-        {
-            var logDirectory = Path.GetDirectoryName(_logFilePath);
-            if (!string.IsNullOrEmpty(logDirectory) && !Directory.Exists(logDirectory))
-            {
-                Directory.CreateDirectory(logDirectory);
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error initializing log directory: {ex.Message}");
-        }
-    }
-
-    public void ShowLogWindow()
-    {
-        if (_dispatcher?.CheckAccess() == false)
-        {
-            _dispatcher.Invoke(ShowLogWindowInternal);
-        }
-        else
-        {
-            ShowLogWindowInternal();
-        }
-    }
-
-    private void ShowLogWindowInternal()
-    {
-        try
-        {
-            switch (_logWindow)
-            {
-                case { IsLoaded: true, IsVisible: true }:
-                    _logWindow.Activate();
-                    return;
-                case { IsLoaded: false }:
-                    _logWindow = null;
-                    break;
-            }
-
-            if (_logWindow == null)
-            {
-                _logWindow = new LogWindow();
-                _logWindow.Closed += (_, _) => { _logWindow = null; };
-            }
-
-            _logWindow.Show();
-            _logWindow.Activate();
-        }
-        catch (Exception ex)
-        {
-            LogErrorInternal($"Failed to show Log Window: {ex.Message}");
-            LogExceptionAsyncFireAndForget(ex, "Error in ShowLogWindowInternal");
-            MessageBox.Show($"Could not display the log window. Please check the log file for details.\nError: {ex.Message}",
-                "Log Window Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
     }
 
     public void Log(string message)
@@ -93,7 +29,6 @@ public class LogService : ILogService, IDisposable
         if (string.IsNullOrWhiteSpace(message)) return;
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Info);
-        _ = LogToFileAsync(formattedMessage);
 
         _dispatcher?.BeginInvoke(() =>
         {
@@ -106,7 +41,6 @@ public class LogService : ILogService, IDisposable
         if (string.IsNullOrWhiteSpace(message)) return;
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Error);
-        _ = LogToFileAsync(formattedMessage);
 
         _dispatcher?.BeginInvoke(() =>
         {
@@ -116,10 +50,6 @@ public class LogService : ILogService, IDisposable
             {
                 _errorsOccurredInBatch = true;
             }
-            else
-            {
-                NotifyUser("Error Occurred", message, MessageBoxImage.Error);
-            }
         });
     }
 
@@ -128,7 +58,6 @@ public class LogService : ILogService, IDisposable
         if (string.IsNullOrWhiteSpace(message)) return;
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Warning);
-        _ = LogToFileAsync(formattedMessage);
 
         _dispatcher?.BeginInvoke(() =>
         {
@@ -138,17 +67,14 @@ public class LogService : ILogService, IDisposable
             {
                 _warningsOccurredInBatch = true;
             }
-            else
-            {
-                NotifyUser("Warning Occurred", message, MessageBoxImage.Warning);
-            }
         });
     }
 
     public async Task LogExceptionAsync(Exception exception, string additionalInfo = "")
     {
         var errorMessage = FormatExceptionMessage(exception, additionalInfo);
-        await LogToFileAsync(errorMessage);
+
+        // Report to bug API
         await _bugReportService.SendExceptionReportAsync(exception);
 
         _dispatcher?.BeginInvoke(() =>
@@ -159,29 +85,7 @@ public class LogService : ILogService, IDisposable
             {
                 _errorsOccurredInBatch = true;
             }
-            else
-            {
-                NotifyUser("Critical Error Occurred", exception.Message, MessageBoxImage.Error);
-            }
         });
-    }
-
-    public void LogExceptionAsyncFireAndForget(Exception exception, string additionalInfo = "")
-    {
-        _ = LogExceptionAsyncFireAndForgetInternal(exception, additionalInfo);
-    }
-
-    private async Task LogExceptionAsyncFireAndForgetInternal(Exception exception, string additionalInfo)
-    {
-        try
-        {
-            await LogExceptionAsync(exception, additionalInfo);
-        }
-        catch (Exception ex)
-        {
-            // Silently fail - we can't log a logging failure
-            Debug.WriteLine($"Failed to log exception: {ex.Message}");
-        }
     }
 
     public void BeginBatchOperation()
@@ -197,95 +101,17 @@ public class LogService : ILogService, IDisposable
 
         if (_errorsOccurredInBatch || _warningsOccurredInBatch)
         {
-            var image = _errorsOccurredInBatch ? MessageBoxImage.Error : MessageBoxImage.Warning;
             var type = _errorsOccurredInBatch ? "errors" : "warnings";
-            var message = $"The batch operation completed, but some {type} occurred. Would you like to open the log file to review them?";
+            var message = $"The batch operation completed, but some {type} occurred. Please review the log viewer for details.";
 
-            _dispatcher?.Invoke(() =>
+            _dispatcher?.BeginInvoke(() =>
             {
-                var result = MessageBox.Show(message, summaryTitle, MessageBoxButton.YesNo, image);
-                if (result == MessageBoxResult.Yes)
-                {
-                    OpenLogFile();
-                }
+                BatchOperationCompleted?.Invoke(this, (summaryTitle, message, _errorsOccurredInBatch));
             });
         }
 
         _errorsOccurredInBatch = false;
         _warningsOccurredInBatch = false;
-    }
-
-    private void NotifyUser(string title, string message, MessageBoxImage image)
-    {
-        var fullMessage = $"{message}\n\nWould you like to open the log file?\n({_logFilePath})";
-        var result = MessageBox.Show(fullMessage, title, MessageBoxButton.YesNo, image);
-
-        if (result == MessageBoxResult.Yes)
-        {
-            OpenLogFile();
-        }
-    }
-
-    private void OpenLogFile()
-    {
-        try
-        {
-            if (!File.Exists(_logFilePath))
-            {
-                MessageBox.Show($"Log file not found at:\n{_logFilePath}", "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            Process.Start(new ProcessStartInfo(_logFilePath) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error opening log file: {ex.Message}");
-            MessageBox.Show($"Could not open log file: {ex.Message}", "Error Opening Log", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void LogErrorInternal(string message)
-    {
-        Debug.WriteLine(message);
-        var formattedMessage = FormatLogMessage(message, LogLevel.Error);
-        _ = LogToFileAsync($"[LogService Internal Error] {formattedMessage}");
-    }
-
-    private async Task LogToFileAsync(string formattedMessage)
-    {
-        if (_disposed) return;
-
-        try
-        {
-            await _logFileSemaphore.WaitAsync();
-        }
-        catch (ObjectDisposedException)
-        {
-            // Semaphore was disposed, ignore the log entry
-            return;
-        }
-
-        try
-        {
-            await using var writer = new StreamWriter(_logFilePath, true, Encoding.UTF8);
-            await writer.WriteAsync(formattedMessage);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Error writing to log file: {ex.Message}");
-        }
-        finally
-        {
-            try
-            {
-                _logFileSemaphore.Release();
-            }
-            catch (ObjectDisposedException)
-            {
-                // Semaphore was disposed, ignore
-            }
-        }
     }
 
     private static string FormatLogMessage(string message, LogLevel level)
@@ -330,30 +156,6 @@ public class LogService : ILogService, IDisposable
 
     public void Dispose()
     {
-        Dispose(true);
         GC.SuppressFinalize(this);
-    }
-
-    private bool _disposed;
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-
-        if (disposing)
-        {
-            _logFileSemaphore.Dispose();
-
-            if (_dispatcher != null)
-            {
-                if (_dispatcher.CheckAccess())
-                    _logWindow?.Close();
-                else
-                    _dispatcher.BeginInvoke(() => _logWindow?.Close());
-            }
-        }
-
-        _logWindow = null;
-        _disposed = true;
     }
 }

@@ -7,26 +7,34 @@ namespace MAMEUtility.Services;
 public class GitHubVersionService : IVersionCheckService, IDisposable
 {
     private const string RepoUrl = "https://api.github.com/repos/drpetersonfernandes/MAMEUtility/releases/latest";
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient;
+    private readonly IVersionService _versionService;
 
-    public GitHubVersionService()
+    public GitHubVersionService(HttpClient httpClient, IVersionService versionService)
     {
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "MAMEUtility-App");
+        _httpClient = httpClient;
+        _versionService = versionService;
     }
 
     public async Task<(bool IsNewVersionAvailable, string? LatestVersion, string? DownloadUrl)> CheckForUpdatesAsync()
     {
         try
         {
-            var response = await _httpClient.GetStringAsync(RepoUrl);
-            using var doc = JsonDocument.Parse(response);
+            var request = new HttpRequestMessage(HttpMethod.Get, RepoUrl);
+            request.Headers.Add("User-Agent", "MAMEUtility-App");
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(content);
             var root = doc.RootElement;
 
             if (root.TryGetProperty("tag_name", out var tagElement))
             {
                 var latestVersionTag = tagElement.GetString() ?? string.Empty;
                 var latestVersionStr = latestVersionTag.TrimStart('v');
-                var currentVersionStr = AboutWindow.RawVersion;
+                var currentVersionStr = _versionService.RawVersion;
 
                 if (Version.TryParse(latestVersionStr, out var latestVersion) &&
                     Version.TryParse(currentVersionStr, out var currentVersion))
@@ -41,15 +49,17 @@ public class GitHubVersionService : IVersionCheckService, IDisposable
 
             return (false, null, null);
         }
-        catch
+        catch (Exception ex)
         {
+            // Report the bug as per user requirement
+            var bugReportService = ServiceLocator.Instance.Resolve<IBugReportService>();
+            await bugReportService.SendExceptionReportAsync(ex);
             return (false, null, null);
         }
     }
 
     public void Dispose()
     {
-        _httpClient.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -1,4 +1,5 @@
-﻿using MAMEUtility.Interfaces;
+using System.Net.Http;
+using MAMEUtility.Interfaces;
 using MAMEUtility.Services;
 
 namespace MAMEUtility;
@@ -7,6 +8,7 @@ public class ServiceLocator
 {
     private static readonly Lazy<ServiceLocator> Instance2 = new(static () => new ServiceLocator());
     private readonly Dictionary<Type, object> _services = new();
+    private static readonly HttpClient SharedHttpClient = new();
 
     public static ServiceLocator Instance => Instance2.Value;
 
@@ -18,13 +20,19 @@ public class ServiceLocator
 
     private void RegisterServices()
     {
+        // VersionService - register first as it's needed by other services
+        var versionService = new VersionService();
+        Register<IVersionService>(versionService);
+
         // AppConfig
         var appConfig = AppConfig.Instance;
 
         // BugReportService
         var bugReportService = new BugReportService(
+            SharedHttpClient,
             appConfig.BugReportApiUrl,
-            appConfig.BugReportApiKey);
+            appConfig.BugReportApiKey,
+            versionService);
         Register<IBugReportService>(bugReportService);
 
         // LogService
@@ -40,12 +48,19 @@ public class ServiceLocator
         Register<IMameProcessingService>(mameProcessingService);
 
         // ApplicationStatsService
-        var appStatsService = new ApplicationStatsService(appConfig.BugReportApiKey);
+        var appStatsService = new ApplicationStatsService(SharedHttpClient, appConfig.BugReportApiKey, versionService);
         Register<IApplicationStatsService>(appStatsService);
 
         // VersionCheckService
-        var versionCheckService = new GitHubVersionService();
+        var versionCheckService = new GitHubVersionService(SharedHttpClient, versionService);
         Register<IVersionCheckService>(versionCheckService);
+
+        // Subscribe to AppConfig load errors
+        AppConfig.ConfigLoadError += (sender, ex) =>
+        {
+            // Fire and forget is acceptable here as this is during startup
+            _ = bugReportService.SendExceptionReportAsync(ex);
+        };
     }
 
     private void Register<T>(T service) where T : class

@@ -124,12 +124,12 @@ public static class CopyImages
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (reader is { NodeType: XmlNodeType.Element, Name: "Machine" })
+                    if (reader.NodeType == XmlNodeType.Element && string.Equals(reader.Name, "Machine", StringComparison.OrdinalIgnoreCase))
                     {
                         using var subReader = reader.ReadSubtree();
                         while (await subReader.ReadAsync())
                         {
-                            if (subReader is { NodeType: XmlNodeType.Element, Name: "MachineName" })
+                            if (subReader.NodeType == XmlNodeType.Element && string.Equals(subReader.Name, "MachineName", StringComparison.OrdinalIgnoreCase))
                             {
                                 var name = await subReader.ReadElementContentAsStringAsync();
                                 if (!string.IsNullOrEmpty(name))
@@ -156,19 +156,15 @@ public static class CopyImages
             const int internalLogInterval = 100;
             const int internalProgressInterval = 50;
 
-            logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting parallel image copy...");
+            logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting sequential image copy...");
 
-            var parallelOptions = new ParallelOptions
+            foreach (var machineName in machineNames)
             {
-                MaxDegreeOfParallelism = Environment.ProcessorCount,
-                CancellationToken = cancellationToken
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            await Parallel.ForEachAsync(machineNames, parallelOptions, async (machineName, ct) =>
-            {
                 try
                 {
-                    await Task.Run(() => ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService), ct);
+                    ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
                 }
                 catch (Exception ex)
                 {
@@ -176,19 +172,19 @@ public static class CopyImages
                     await logService.LogExceptionAsync(ex, $"Error processing images for {machineName}");
                 }
 
-                var currentCount = Interlocked.Increment(ref machinesProcessedCount);
+                machinesProcessedCount++;
 
-                if (currentCount % internalLogInterval == 0 || currentCount == totalMachines)
+                if (machinesProcessedCount % internalLogInterval == 0 || machinesProcessedCount == totalMachines)
                 {
-                    logService.Log($"Image copy progress for {fileName}: {currentCount}/{totalMachines} machines processed");
+                    logService.Log($"Image copy progress for {fileName}: {machinesProcessedCount}/{totalMachines} machines processed");
                 }
 
-                if (currentCount % internalProgressInterval == 0 || currentCount == totalMachines)
+                if (machinesProcessedCount % internalProgressInterval == 0 || machinesProcessedCount == totalMachines)
                 {
-                    var progressPercentage = (double)currentCount / totalMachines * 100;
+                    var progressPercentage = (double)machinesProcessedCount / totalMachines * 100;
                     progress.Report((int)progressPercentage);
                 }
-            });
+            }
 
             logService.Log($"Completed processing {machinesProcessedCount} machines from {fileName}");
         }

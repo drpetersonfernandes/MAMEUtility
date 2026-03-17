@@ -33,62 +33,64 @@ public static class MameFull
                     Async = true
                 };
 
-                await using var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
-                var totalBytes = fileStream.Length;
-                var lastReportedProgress = -1;
-
-                using var reader = XmlReader.Create(fileStream, readerSettings);
-                await using var writer = XmlWriter.Create(tempFilePath, writerSettings);
-
-                await writer.WriteStartDocumentAsync();
-                await writer.WriteStartElementAsync(null, "Machines", null);
-
-                long processed = 0;
-                const int logInterval = 5000;
-
-                while (await reader.ReadAsync())
+                await using (var writerStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write))
+                await using (var writer = XmlWriter.Create(writerStream, writerSettings))
+                await using (var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    var totalBytes = fileStream.Length;
+                    var lastReportedProgress = -1;
 
-                    if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
+                    using var reader = XmlReader.Create(fileStream, readerSettings);
+                    await writer.WriteStartDocumentAsync();
+                    await writer.WriteStartElementAsync(null, "Machines", null);
+
+                    long processed = 0;
+                    const int logInterval = 5000;
+
+                    while (await reader.ReadAsync())
                     {
-                        var name = reader.GetAttribute("name");
-                        using var subReader = reader.ReadSubtree();
-                        string? description = null;
+                        cancellationToken.ThrowIfCancellationRequested();
 
-                        while (await subReader.ReadAsync())
+                        if (reader.NodeType == XmlNodeType.Element && string.Equals(reader.Name, "machine", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                            var name = reader.GetAttribute("name");
+                            using var subReader = reader.ReadSubtree();
+                            string? description = null;
+
+                            while (await subReader.ReadAsync())
                             {
-                                description = await subReader.ReadElementContentAsStringAsync();
-                                break;
+                                if (subReader.NodeType == XmlNodeType.Element && string.Equals(subReader.Name, "description", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    description = await subReader.ReadElementContentAsStringAsync();
+                                    break;
+                                }
+                            }
+
+                            await writer.WriteStartElementAsync(null, "Machine", null);
+                            await writer.WriteElementStringAsync(null, "MachineName", null, name ?? string.Empty);
+                            await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
+                            await writer.WriteEndElementAsync();
+
+                            processed++;
+                            if (processed % logInterval == 0)
+                                logService.Log($"Progress: {processed} machines processed...");
+                        }
+
+                        // Report progress based on stream position
+                        if (totalBytes > 0)
+                        {
+                            var currentProgress = (int)((double)fileStream.Position / totalBytes * 99);
+                            if (currentProgress > lastReportedProgress)
+                            {
+                                progress.Report(currentProgress);
+                                lastReportedProgress = currentProgress;
                             }
                         }
-
-                        await writer.WriteStartElementAsync(null, "Machine", null);
-                        await writer.WriteElementStringAsync(null, "MachineName", null, name ?? string.Empty);
-                        await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
-                        await writer.WriteEndElementAsync();
-
-                        processed++;
-                        if (processed % logInterval == 0)
-                            logService.Log($"Progress: {processed} machines processed...");
                     }
 
-                    // Report progress based on stream position
-                    if (totalBytes > 0)
-                    {
-                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 99);
-                        if (currentProgress > lastReportedProgress)
-                        {
-                            progress.Report(currentProgress);
-                            lastReportedProgress = currentProgress;
-                        }
-                    }
+                    await writer.WriteEndElementAsync();
+                    await writer.WriteEndDocumentAsync();
                 }
-
-                await writer.WriteEndElementAsync();
-                await writer.WriteEndDocumentAsync();
 
                 // After closing the files, move the temporary file to the final destination
                 if (File.Exists(outputFilePathMameFull))

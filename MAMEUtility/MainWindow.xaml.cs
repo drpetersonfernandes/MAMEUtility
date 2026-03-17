@@ -41,9 +41,15 @@ public partial class MainWindow
 
         // Subscribe to log messages
         _logService.LogMessageAdded += LogService_LogMessageAdded;
+        _logService.BatchOperationCompleted += LogService_BatchOperationCompleted;
 
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
+    }
+
+    private static void LogService_BatchOperationCompleted(object? sender, (string Title, string Message, bool HasErrors) e)
+    {
+        MessageBox.Show(e.Message, e.Title, MessageBoxButton.OK, e.HasErrors ? MessageBoxImage.Error : MessageBoxImage.Warning);
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -54,14 +60,14 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _logService.LogExceptionAsyncFireAndForget(ex, "Error in MainWindow_Loaded");
+            await _logService.LogExceptionAsync(ex, "Error in MainWindow_Loaded");
         }
     }
 
     private async Task HandleStartupServicesAsync()
     {
         // 1. Call application stats API
-        _ = _appStatsService.SendStartStatsAsync();
+        await _appStatsService.SendStartStatsAsync();
 
         // 2. Check for updates
         var (isNewVersionAvailable, latestVersion, downloadUrl) = await _versionCheckService.CheckForUpdatesAsync();
@@ -100,28 +106,20 @@ public partial class MainWindow
 
     private void LogService_LogMessageAdded(object? sender, string message)
     {
-        if (Dispatcher.CheckAccess())
-        {
-            LogViewer.AppendText(message);
-            LogViewer.ScrollToEnd();
-        }
-        else
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                LogViewer.AppendText(message);
-                LogViewer.ScrollToEnd();
-            });
-        }
+        // LogService already dispatches to UI thread via Dispatcher.BeginInvoke,
+        // so this handler is always called on the UI thread.
+        LogViewer.AppendText(message);
+        LogViewer.ScrollToEnd();
     }
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
-        // Unsubscribe from event to prevent memory leak
+        // Unsubscribe from events to prevent memory leak
         _logService.LogMessageAdded -= LogService_LogMessageAdded;
+        _logService.BatchOperationCompleted -= LogService_BatchOperationCompleted;
     }
 
-    public static string VersionText => AboutWindow.ApplicationVersion;
+    public static string VersionText => ServiceLocator.Instance.Resolve<IVersionService>().ApplicationVersion;
 
     private void ProcessingTimer_Tick(object? sender, EventArgs e)
     {
@@ -624,7 +622,7 @@ public partial class MainWindow
         }
     }
 
-    private void Donate_Click(object sender, RoutedEventArgs e)
+    private async void Donate_Click(object sender, RoutedEventArgs e)
     {
         try
         {
@@ -638,7 +636,7 @@ public partial class MainWindow
         catch (Exception ex)
         {
             _dialogService.ShowError("Unable to open the link: " + ex.Message);
-            _logService.LogExceptionAsyncFireAndForget(ex, "Error in Donate");
+            await _logService.LogExceptionAsync(ex, "Error in Donate");
         }
     }
 

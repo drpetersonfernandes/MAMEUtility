@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Xml;
 using MAMEUtility.Interfaces;
 
@@ -48,14 +48,16 @@ public static class MameManufacturer
                             {
                                 if (subReader.NodeType == XmlNodeType.Element)
                                 {
-                                    switch (subReader.Name)
+                                    var nodeName = subReader.Name;
+                                    if (string.Equals(nodeName, "manufacturer", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        case "manufacturer":
-                                            manufacturer = await subReader.ReadElementContentAsStringAsync();
-                                            break;
-                                        case "description":
-                                            description = await subReader.ReadElementContentAsStringAsync();
-                                            break;
+                                        manufacturer = await subReader.ReadElementContentAsStringAsync();
+                                        continue; // ReadElementContentAsStringAsync already advanced the reader
+                                    }
+
+                                    if (string.Equals(nodeName, "description", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        description = await subReader.ReadElementContentAsStringAsync();
                                     }
                                 }
                             }

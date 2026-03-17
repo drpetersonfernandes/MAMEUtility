@@ -11,11 +11,14 @@ public class ApplicationStatsService : IApplicationStatsService, IDisposable
     private const string ApiUrl = "https://www.purelogiccode.com/ApplicationStats/stats";
     private readonly string _apiKey;
     private const string ApplicationId = "mame-utility";
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient;
+    private readonly IVersionService _versionService;
 
-    public ApplicationStatsService(string apiKey)
+    public ApplicationStatsService(HttpClient httpClient, string apiKey, IVersionService versionService)
     {
+        _httpClient = httpClient;
         _apiKey = apiKey;
+        _versionService = versionService;
     }
 
     public async Task SendStartStatsAsync()
@@ -25,26 +28,31 @@ public class ApplicationStatsService : IApplicationStatsService, IDisposable
             var content = new
             {
                 applicationId = ApplicationId,
-                version = AboutWindow.ApplicationVersion
+                version = _versionService.ApplicationVersion
             };
 
             var json = JsonSerializer.Serialize(content);
             using var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
 
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            var request = new HttpRequestMessage(HttpMethod.Post, ApiUrl)
+            {
+                Content = stringContent
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-            await _httpClient.PostAsync(ApiUrl, stringContent);
+            await _httpClient.SendAsync(request);
             // We don't strictly need to ensure success, stats collection should be silent
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail if sending fails
+            // Report bugs as requested
+            var bugReportService = ServiceLocator.Instance.Resolve<IBugReportService>();
+            await bugReportService.SendExceptionReportAsync(ex);
         }
     }
 
     public void Dispose()
     {
-        _httpClient.Dispose();
         GC.SuppressFinalize(this);
     }
 }

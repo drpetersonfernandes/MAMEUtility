@@ -40,14 +40,16 @@ public static class MameYear
                             {
                                 if (subReader.NodeType == XmlNodeType.Element)
                                 {
-                                    switch (subReader.Name)
+                                    var nodeName = subReader.Name;
+                                    if (string.Equals(nodeName, "year", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        case "year":
-                                            year = await subReader.ReadElementContentAsStringAsync();
-                                            break;
-                                        case "description":
-                                            description = await subReader.ReadElementContentAsStringAsync();
-                                            break;
+                                        year = await subReader.ReadElementContentAsStringAsync();
+                                        continue;
+                                    }
+
+                                    if (string.Equals(nodeName, "description", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        description = await subReader.ReadElementContentAsStringAsync();
                                     }
                                 }
                             }

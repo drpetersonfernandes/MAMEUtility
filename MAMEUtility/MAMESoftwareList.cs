@@ -54,7 +54,7 @@ public static class MameSoftwareList
                         {
                             cancellationToken.ThrowIfCancellationRequested();
 
-                            if (reader is { NodeType: XmlNodeType.Element, Name: "software" })
+                            if (reader.NodeType == XmlNodeType.Element && string.Equals(reader.Name, "software", StringComparison.OrdinalIgnoreCase))
                             {
                                 var name = reader.GetAttribute("name");
                                 string? description = null;
@@ -63,7 +63,7 @@ public static class MameSoftwareList
                                 {
                                     while (await subReader.ReadAsync())
                                     {
-                                        if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                                        if (subReader.NodeType == XmlNodeType.Element && string.Equals(subReader.Name, "description", StringComparison.OrdinalIgnoreCase))
                                         {
                                             description = await subReader.ReadElementContentAsStringAsync();
                                             break;

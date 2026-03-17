@@ -124,12 +124,12 @@ public static class CopyRoms
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (reader is { NodeType: XmlNodeType.Element, Name: "Machine" })
+                    if (reader.NodeType == XmlNodeType.Element && string.Equals(reader.Name, "Machine", StringComparison.OrdinalIgnoreCase))
                     {
                         using var subReader = reader.ReadSubtree();
                         while (await subReader.ReadAsync())
                         {
-                            if (subReader is { NodeType: XmlNodeType.Element, Name: "MachineName" })
+                            if (subReader.NodeType == XmlNodeType.Element && string.Equals(subReader.Name, "MachineName", StringComparison.OrdinalIgnoreCase))
                             {
                                 var name = await subReader.ReadElementContentAsStringAsync();
                                 if (!string.IsNullOrEmpty(name))
@@ -156,20 +156,15 @@ public static class CopyRoms
             const int internalLogInterval = 100;
             const int internalProgressInterval = 50;
 
-            logService.Log($"Found {totalRoms} machine entries in {fileName}. Starting parallel copy...");
+            logService.Log($"Found {totalRoms} machine entries in {fileName}. Starting sequential copy...");
 
-            var parallelOptions = new ParallelOptions
+            foreach (var machineName in machineNames)
             {
-                MaxDegreeOfParallelism = Environment.ProcessorCount,
-                CancellationToken = cancellationToken
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            await Parallel.ForEachAsync(machineNames, parallelOptions, async (machineName, ct) =>
-            {
                 try
                 {
-                    // Run the blocking File.Copy on a thread pool thread
-                    await Task.Run(() => CopyRom(sourceDirectory, destinationDirectory, machineName, logService), ct);
+                    CopyRom(sourceDirectory, destinationDirectory, machineName, logService);
                 }
                 catch (Exception ex)
                 {
@@ -177,19 +172,19 @@ public static class CopyRoms
                     await logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}");
                 }
 
-                var currentCount = Interlocked.Increment(ref romsProcessed);
+                romsProcessed++;
 
-                if (currentCount % internalLogInterval == 0 || currentCount == totalRoms)
+                if (romsProcessed % internalLogInterval == 0 || romsProcessed == totalRoms)
                 {
-                    logService.Log($"ROM copy progress for {fileName}: {currentCount}/{totalRoms}");
+                    logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
                 }
 
-                if (currentCount % internalProgressInterval == 0 || currentCount == totalRoms)
+                if (romsProcessed % internalProgressInterval == 0 || romsProcessed == totalRoms)
                 {
-                    var progressPercentage = (double)currentCount / totalRoms * 100;
+                    var progressPercentage = (double)romsProcessed / totalRoms * 100;
                     progress.Report((int)progressPercentage);
                 }
-            });
+            }
 
             logService.Log($"Completed processing {romsProcessed} ROMs from {fileName}");
         }
@@ -215,7 +210,7 @@ public static class CopyRoms
         }
         else
         {
-            logService.Log($"Source ROM file not found: {sourceFile}");
+            logService.LogWarning($"Source ROM file not found: {sourceFile}");
         }
     }
 }

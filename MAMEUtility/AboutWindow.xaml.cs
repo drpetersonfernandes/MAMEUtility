@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Reflection;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Navigation;
 using MAMEUtility.Interfaces;
@@ -12,6 +11,7 @@ namespace MAMEUtility;
 public partial class AboutWindow
 {
     private readonly ILogService _logService;
+    private readonly IVersionService _versionService;
 
     /// <summary>
     /// Constructor
@@ -20,28 +20,12 @@ public partial class AboutWindow
     {
         InitializeComponent();
 
-        // Get the log service
+        // Get services
         _logService = ServiceLocator.Instance.Resolve<ILogService>();
+        _versionService = ServiceLocator.Instance.Resolve<IVersionService>();
 
         // Set the version text
-        VersionTextBlock.Text = ApplicationVersion;
-    }
-
-    /// <summary>
-    /// Gets the application version
-    /// </summary>
-    public static string ApplicationVersion => "Version: " + RawVersion;
-
-    /// <summary>
-    /// Gets the raw application version string
-    /// </summary>
-    public static string RawVersion
-    {
-        get
-        {
-            var version = Assembly.GetExecutingAssembly().GetName().Version;
-            return version?.ToString() ?? "0.0.0.0";
-        }
+        VersionTextBlock.Text = _versionService.ApplicationVersion;
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

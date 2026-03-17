@@ -12,6 +12,12 @@ public class AppConfig
 
     public static AppConfig Instance => Instance2.Value;
 
+    /// <summary>
+    /// Event raised when an error occurs during configuration loading.
+    /// Subscribers can report the exception to the bug reporting service.
+    /// </summary>
+    public static event EventHandler<Exception>? ConfigLoadError;
+
     private static AppConfig LoadConfig()
     {
         try
@@ -26,9 +32,10 @@ public class AppConfig
                 return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // If we can't load the config, use defaults
+            // Report the exception via event to allow bug reporting
+            ConfigLoadError?.Invoke(null, ex);
         }
 
         return new AppConfig();

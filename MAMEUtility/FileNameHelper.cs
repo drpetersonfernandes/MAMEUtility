@@ -89,8 +89,19 @@ public static partial class FileNameHelper
 
             return string.Equals(fullPath1, fullPath2, StringComparison.OrdinalIgnoreCase);
         }
-        catch
+        catch (Exception ex)
         {
+            // Report exception to bug API
+            try
+            {
+                var bugReportService = ServiceLocator.Instance.Resolve<Interfaces.IBugReportService>();
+                _ = bugReportService.SendExceptionReportAsync(ex);
+            }
+            catch
+            {
+                // Silently fail if bug reporting is not available
+            }
+
             return false;
         }
     }

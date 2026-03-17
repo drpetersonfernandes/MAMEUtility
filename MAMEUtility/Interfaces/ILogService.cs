@@ -1,4 +1,4 @@
-﻿namespace MAMEUtility.Interfaces;
+namespace MAMEUtility.Interfaces;
 
 public interface ILogService
 {
@@ -10,12 +10,9 @@ public interface ILogService
 
     Task LogExceptionAsync(Exception exception, string additionalInfo = "");
 
-    void LogExceptionAsyncFireAndForget(Exception exception, string additionalInfo = "");
-
-    void ShowLogWindow();
-
     void BeginBatchOperation();
     void EndBatchOperation(string summaryTitle = "Batch Operation Completed");
 
     event EventHandler<string> LogMessageAdded;
+    event EventHandler<(string Title, string Message, bool HasErrors)> BatchOperationCompleted;
 }

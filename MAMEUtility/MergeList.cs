@@ -44,7 +44,9 @@ public static class MergeList
 
                     if (reader.NodeType != XmlNodeType.Element) continue;
 
-                    if (reader.Name is "Machine" or "Software")
+                    var nodeName = reader.Name;
+                    if (string.Equals(nodeName, "Machine", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(nodeName, "Software", StringComparison.OrdinalIgnoreCase))
                     {
                         string? machineName = null;
                         string? description = null;
@@ -55,15 +57,17 @@ public static class MergeList
                             {
                                 if (subReader.NodeType == XmlNodeType.Element)
                                 {
-                                    switch (subReader.Name)
+                                    var subNodeName = subReader.Name;
+                                    if (string.Equals(subNodeName, "MachineName", StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(subNodeName, "SoftwareName", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        case "MachineName":
-                                        case "SoftwareName":
-                                            machineName = await subReader.ReadElementContentAsStringAsync();
-                                            break;
-                                        case "Description":
-                                            description = await subReader.ReadElementContentAsStringAsync();
-                                            break;
+                                        machineName = await subReader.ReadElementContentAsStringAsync();
+                                        continue;
+                                    }
+
+                                    if (string.Equals(subNodeName, "Description", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        description = await subReader.ReadElementContentAsStringAsync();
                                     }
                                 }
                             }

@@ -28,7 +28,7 @@ public static class MameSourcefile
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
+                    if (reader.NodeType == XmlNodeType.Element && string.Equals(reader.Name, "machine", StringComparison.OrdinalIgnoreCase))
                     {
                         var name = reader.GetAttribute("name") ?? "";
                         var sourceFile = reader.GetAttribute("sourcefile") ?? "";
@@ -38,7 +38,7 @@ public static class MameSourcefile
                         {
                             while (await subReader.ReadAsync())
                             {
-                                if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                                if (subReader.NodeType == XmlNodeType.Element && string.Equals(subReader.Name, "description", StringComparison.OrdinalIgnoreCase))
                                 {
                                     description = await subReader.ReadElementContentAsStringAsync();
                                     break;
