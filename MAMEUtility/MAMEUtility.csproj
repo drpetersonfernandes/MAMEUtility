@@ -1,44 +1,55 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
-    <ApplicationIcon>icon\icon.ico</ApplicationIcon>
-    <PackageIcon>icon2.png</PackageIcon>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <AssemblyVersion>1.3</AssemblyVersion>
-    <FileVersion>1.3</FileVersion>
-    <LangVersion>14</LangVersion>
-    <NeutralLanguage>en-US</NeutralLanguage>
-    <DebugType>embedded</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+        <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+        <ApplicationIcon>icon\icon.ico</ApplicationIcon>
+        <PackageIcon>icon2.png</PackageIcon>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <AssemblyVersion>1.3</AssemblyVersion>
+        <FileVersion>1.3</FileVersion>
+        <LangVersion>14</LangVersion>
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <DebugType>embedded</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="images\logo.png" />
-  </ItemGroup>
+    <ItemGroup>
+        <None Remove="images\logo.png" />
+    </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="icon\icon.ico" />
-    <Resource Include="images\logo.png">
-      <CopyToOutputDirectory></CopyToOutputDirectory>
-    </Resource>
-  </ItemGroup>
+    <ItemGroup>
+        <Content Include="icon\icon.ico" />
+        <Resource Include="images\logo.png">
+        </Resource>
+    </ItemGroup>
 
-  <ItemGroup>
-    <None Update="icon\icon2.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
+    <ItemGroup>
+        <None Update="icon\icon2.png">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+    </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="MessagePack" Version="3.1.4" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="MessagePack" Version="3.1.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Remove="References\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Remove="References\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Page Remove="References\**" />
+    </ItemGroup>
 
 </Project>

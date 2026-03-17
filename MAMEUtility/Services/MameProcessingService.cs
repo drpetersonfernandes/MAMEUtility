@@ -1,3 +1,5 @@
+using System.Xml;
+using System.Xml.Linq;
 using MAMEUtility.Interfaces;
 
 namespace MAMEUtility.Services;
@@ -16,7 +18,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await MameFull.CreateAndSaveMameFullAsync(inputFilePath, outputFilePath, progress, _logService, cancellationToken);
         }
-        catch (System.Xml.XmlException ex)
+        catch (XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated. It ended unexpectedly at line {ex.LineNumber}. Please re-download or re-generate the MAME XML file.");
             throw;
@@ -39,7 +41,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await MameManufacturer.CreateAndSaveMameManufacturerAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
         }
-        catch (System.Xml.XmlException ex)
+        catch (XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
             throw;
@@ -60,9 +62,10 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
     {
         try
         {
-            await MameYear.CreateAndSaveMameYearAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
+            var inputDoc = await Task.Run(() => XDocument.Load(inputFilePath), cancellationToken);
+            await MameYear.CreateAndSaveMameYearAsync(inputDoc, outputFolderPath, progress, _logService, cancellationToken);
         }
-        catch (System.Xml.XmlException ex)
+        catch (XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
             throw;
@@ -85,7 +88,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await MameSourcefile.CreateAndSaveMameSourcefileAsync(inputFilePath, outputFolderPath, progress, _logService, cancellationToken);
         }
-        catch (System.Xml.XmlException ex)
+        catch (XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
             throw;
@@ -108,7 +111,7 @@ public class MameProcessingService(ILogService logService) : IMameProcessingServ
         {
             await MameSoftwareList.CreateAndSaveSoftwareListAsync(inputFolderPath, outputFilePath, progress, _logService, cancellationToken);
         }
-        catch (System.Xml.XmlException ex)
+        catch (XmlException ex)
         {
             await _logService.LogExceptionAsync(ex, $"The XML file is corrupted or truncated at line {ex.LineNumber}.");
             throw;
