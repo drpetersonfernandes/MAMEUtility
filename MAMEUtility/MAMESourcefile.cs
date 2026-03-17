@@ -13,10 +13,10 @@ public static class MameSourcefile
 
         try
         {
-            // First pass: collect unique source files
-            var sourceFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sourcefileData = new Dictionary<string, List<(string Name, string Description)>>(StringComparer.OrdinalIgnoreCase);
             var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
 
+            // Single pass: collect all required data grouped by source file
             await using (var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read))
             {
                 var totalBytes = fileStream.Length;
@@ -30,23 +30,43 @@ public static class MameSourcefile
 
                     if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                     {
+                        var name = reader.GetAttribute("name") ?? "";
                         var sourceFile = reader.GetAttribute("sourcefile") ?? "";
+                        string? description = null;
+
+                        using (var subReader = reader.ReadSubtree())
+                        {
+                            while (await subReader.ReadAsync())
+                            {
+                                if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
+                                {
+                                    description = await subReader.ReadElementContentAsStringAsync();
+                                    break;
+                                }
+                            }
+                        }
 
                         if (!string.IsNullOrWhiteSpace(sourceFile))
                         {
-                            sourceFiles.Add(sourceFile);
+                            if (!sourcefileData.TryGetValue(sourceFile, out var machines))
+                            {
+                                machines = new List<(string Name, string Description)>();
+                                sourcefileData[sourceFile] = machines;
+                            }
+
+                            machines.Add((name, description ?? string.Empty));
                         }
 
                         processedCount++;
                         if (processedCount % 10000 == 0)
                         {
-                            logService.Log($"Scanned {processedCount} machines for source files...");
+                            logService.Log($"Scanned {processedCount} machines...");
                         }
                     }
 
                     if (totalBytes > 0)
                     {
-                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 25);
+                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 50);
                         if (currentProgress > lastReportedProgress)
                         {
                             progress.Report(currentProgress);
@@ -56,18 +76,20 @@ public static class MameSourcefile
                 }
             }
 
-            progress.Report(25);
-            logService.Log($"Found {sourceFiles.Count} unique source files. Processing each...");
+            logService.Log($"Found {sourcefileData.Count} unique source files. Saving files...");
 
-            // Second pass: for each source file, stream through file and write matches
-            var totalSourceFiles = sourceFiles.Count;
+            // Second phase: Write the collected data to files
+            var totalSourceFiles = sourcefileData.Count;
             var sourceFilesSavedCount = 0;
             var generatedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
 
-            foreach (var sourceFile in sourceFiles)
+            foreach (var kvp in sourcefileData)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                var sourceFile = kvp.Key;
+                var machines = kvp.Value;
 
                 var baseSafeName = FileNameHelper.SanitizeForFileName(Path.GetFileNameWithoutExtension(sourceFile));
                 var uniqueSafeName = baseSafeName;
@@ -86,40 +108,12 @@ public static class MameSourcefile
                     await writer.WriteStartDocumentAsync();
                     await writer.WriteStartElementAsync(null, "Machines", null);
 
-                    // Stream through input file and write matching machines
-                    await using var readStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
-                    using var readReader = XmlReader.Create(readStream, readerSettings);
-
-                    while (await readReader.ReadAsync())
+                    foreach (var machine in machines)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        if (readReader is { NodeType: XmlNodeType.Element, Name: "machine" })
-                        {
-                            var name = readReader.GetAttribute("name") ?? "";
-                            var machineSourceFile = readReader.GetAttribute("sourcefile") ?? "";
-                            string? description = null;
-
-                            using (var subReader = readReader.ReadSubtree())
-                            {
-                                while (await subReader.ReadAsync())
-                                {
-                                    if (subReader is { NodeType: XmlNodeType.Element, Name: "description" })
-                                    {
-                                        description = await subReader.ReadElementContentAsStringAsync();
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (string.Equals(machineSourceFile, sourceFile, StringComparison.OrdinalIgnoreCase))
-                            {
-                                await writer.WriteStartElementAsync(null, "Machine", null);
-                                await writer.WriteElementStringAsync(null, "MachineName", null, name);
-                                await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
-                                await writer.WriteEndElementAsync();
-                            }
-                        }
+                        await writer.WriteStartElementAsync(null, "Machine", null);
+                        await writer.WriteElementStringAsync(null, "MachineName", null, machine.Name);
+                        await writer.WriteElementStringAsync(null, "Description", null, machine.Description);
+                        await writer.WriteEndElementAsync();
                     }
 
                     await writer.WriteEndElementAsync();
@@ -127,7 +121,7 @@ public static class MameSourcefile
                 }
 
                 sourceFilesSavedCount++;
-                var currentProgress = 25 + (int)((double)sourceFilesSavedCount / totalSourceFiles * 75);
+                var currentProgress = 50 + (int)((double)sourceFilesSavedCount / totalSourceFiles * 50);
                 progress.Report(currentProgress);
 
                 if (sourceFilesSavedCount % 10 == 0 || sourceFilesSavedCount == totalSourceFiles)

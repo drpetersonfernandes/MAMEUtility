@@ -13,10 +13,10 @@ public static class MameYear
 
         try
         {
-            // First pass: collect unique years
-            var years = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var yearData = new Dictionary<string, List<(string Name, string Description)>>(StringComparer.OrdinalIgnoreCase);
             var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
 
+            // Single pass: collect all required data grouped by year
             await using (var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read))
             {
                 var totalBytes = fileStream.Length;
@@ -30,34 +30,50 @@ public static class MameYear
 
                     if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                     {
+                        var name = reader.GetAttribute("name") ?? "";
                         string? year = null;
+                        string? description = null;
+
                         using (var subReader = reader.ReadSubtree())
                         {
                             while (await subReader.ReadAsync())
                             {
-                                if (subReader is { NodeType: XmlNodeType.Element, Name: "year" })
+                                if (subReader.NodeType == XmlNodeType.Element)
                                 {
-                                    year = await subReader.ReadElementContentAsStringAsync();
-                                    break;
+                                    switch (subReader.Name)
+                                    {
+                                        case "year":
+                                            year = await subReader.ReadElementContentAsStringAsync();
+                                            break;
+                                        case "description":
+                                            description = await subReader.ReadElementContentAsStringAsync();
+                                            break;
+                                    }
                                 }
                             }
                         }
 
                         if (!string.IsNullOrWhiteSpace(year) && IsValidYear(year))
                         {
-                            years.Add(year);
+                            if (!yearData.TryGetValue(year, out var machines))
+                            {
+                                machines = new List<(string Name, string Description)>();
+                                yearData[year] = machines;
+                            }
+
+                            machines.Add((name, description ?? string.Empty));
                         }
 
                         processedCount++;
                         if (processedCount % 10000 == 0)
                         {
-                            logService.Log($"Scanned {processedCount} machines for years...");
+                            logService.Log($"Scanned {processedCount} machines...");
                         }
                     }
 
                     if (totalBytes > 0)
                     {
-                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 25);
+                        var currentProgress = (int)((double)fileStream.Position / totalBytes * 50);
                         if (currentProgress > lastReportedProgress)
                         {
                             progress.Report(currentProgress);
@@ -67,18 +83,19 @@ public static class MameYear
                 }
             }
 
-            progress.Report(25);
-            logService.Log($"Found {years.Count} unique years. Processing each...");
+            logService.Log($"Found {yearData.Count} unique years. Saving files...");
 
-            // Second pass: for each year, stream through file and write matches
-            var totalYears = years.Count;
+            // Second phase: Write the collected data to files
+            var totalYears = yearData.Count;
             var yearsSaved = 0;
             var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
 
-            foreach (var year in years)
+            foreach (var kvp in yearData)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                var year = kvp.Key;
+                var machines = kvp.Value;
                 var safeYear = year.Replace("?", "X");
                 var outputFilePath = Path.Combine(outputFolderMameYear, $"{safeYear}.xml");
 
@@ -87,47 +104,12 @@ public static class MameYear
                     await writer.WriteStartDocumentAsync();
                     await writer.WriteStartElementAsync(null, "Machines", null);
 
-                    // Stream through input file and write matching machines
-                    await using var readStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read);
-                    using var readReader = XmlReader.Create(readStream, readerSettings);
-
-                    while (await readReader.ReadAsync())
+                    foreach (var machine in machines)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        if (readReader is { NodeType: XmlNodeType.Element, Name: "machine" })
-                        {
-                            var name = readReader.GetAttribute("name") ?? "";
-                            string? machineYear = null;
-                            string? description = null;
-
-                            using (var subReader = readReader.ReadSubtree())
-                            {
-                                while (await subReader.ReadAsync())
-                                {
-                                    if (subReader.NodeType == XmlNodeType.Element)
-                                    {
-                                        switch (subReader.Name)
-                                        {
-                                            case "year":
-                                                machineYear = await subReader.ReadElementContentAsStringAsync();
-                                                break;
-                                            case "description":
-                                                description = await subReader.ReadElementContentAsStringAsync();
-                                                break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (string.Equals(machineYear, year, StringComparison.OrdinalIgnoreCase))
-                            {
-                                await writer.WriteStartElementAsync(null, "Machine", null);
-                                await writer.WriteElementStringAsync(null, "MachineName", null, name);
-                                await writer.WriteElementStringAsync(null, "Description", null, description ?? string.Empty);
-                                await writer.WriteEndElementAsync();
-                            }
-                        }
+                        await writer.WriteStartElementAsync(null, "Machine", null);
+                        await writer.WriteElementStringAsync(null, "MachineName", null, machine.Name);
+                        await writer.WriteElementStringAsync(null, "Description", null, machine.Description);
+                        await writer.WriteEndElementAsync();
                     }
 
                     await writer.WriteEndElementAsync();
@@ -135,7 +117,7 @@ public static class MameYear
                 }
 
                 yearsSaved++;
-                var currentProgress = 25 + (int)((double)yearsSaved / totalYears * 75);
+                var currentProgress = 50 + (int)((double)yearsSaved / totalYears * 50);
                 progress.Report(currentProgress);
 
                 if (yearsSaved % 10 == 0 || yearsSaved == totalYears)

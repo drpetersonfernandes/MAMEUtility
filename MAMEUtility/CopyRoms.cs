@@ -156,15 +156,20 @@ public static class CopyRoms
             const int internalLogInterval = 100;
             const int internalProgressInterval = 50;
 
-            logService.Log($"Found {totalRoms} machine entries in {fileName}. Starting sequential copy...");
+            logService.Log($"Found {totalRoms} machine entries in {fileName}. Starting parallel copy...");
 
-            foreach (var machineName in machineNames)
+            var parallelOptions = new ParallelOptions
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = cancellationToken
+            };
 
+            await Parallel.ForEachAsync(machineNames, parallelOptions, async (machineName, ct) =>
+            {
                 try
                 {
-                    CopyRom(sourceDirectory, destinationDirectory, machineName, logService);
+                    // Run the blocking File.Copy on a thread pool thread
+                    await Task.Run(() => CopyRom(sourceDirectory, destinationDirectory, machineName, logService), ct);
                 }
                 catch (Exception ex)
                 {
@@ -172,19 +177,19 @@ public static class CopyRoms
                     await logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}");
                 }
 
-                romsProcessed++;
+                var currentCount = Interlocked.Increment(ref romsProcessed);
 
-                if (romsProcessed % internalLogInterval == 0 || romsProcessed == totalRoms)
+                if (currentCount % internalLogInterval == 0 || currentCount == totalRoms)
                 {
-                    logService.Log($"ROM copy progress for {fileName}: {romsProcessed}/{totalRoms}");
+                    logService.Log($"ROM copy progress for {fileName}: {currentCount}/{totalRoms}");
                 }
 
-                if (romsProcessed % internalProgressInterval == 0 || romsProcessed == totalRoms)
+                if (currentCount % internalProgressInterval == 0 || currentCount == totalRoms)
                 {
-                    var progressPercentage = (double)romsProcessed / totalRoms * 100;
+                    var progressPercentage = (double)currentCount / totalRoms * 100;
                     progress.Report((int)progressPercentage);
                 }
-            }
+            });
 
             logService.Log($"Completed processing {romsProcessed} ROMs from {fileName}");
         }

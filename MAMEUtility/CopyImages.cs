@@ -156,15 +156,19 @@ public static class CopyImages
             const int internalLogInterval = 100;
             const int internalProgressInterval = 50;
 
-            logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting sequential image copy...");
+            logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting parallel image copy...");
 
-            foreach (var machineName in machineNames)
+            var parallelOptions = new ParallelOptions
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                MaxDegreeOfParallelism = Environment.ProcessorCount,
+                CancellationToken = cancellationToken
+            };
 
+            await Parallel.ForEachAsync(machineNames, parallelOptions, async (machineName, ct) =>
+            {
                 try
                 {
-                    ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
+                    await Task.Run(() => ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService), ct);
                 }
                 catch (Exception ex)
                 {
@@ -172,19 +176,19 @@ public static class CopyImages
                     await logService.LogExceptionAsync(ex, $"Error processing images for {machineName}");
                 }
 
-                machinesProcessedCount++;
+                var currentCount = Interlocked.Increment(ref machinesProcessedCount);
 
-                if (machinesProcessedCount % internalLogInterval == 0 || machinesProcessedCount == totalMachines)
+                if (currentCount % internalLogInterval == 0 || currentCount == totalMachines)
                 {
-                    logService.Log($"Image copy progress for {fileName}: {machinesProcessedCount}/{totalMachines} machines processed");
+                    logService.Log($"Image copy progress for {fileName}: {currentCount}/{totalMachines} machines processed");
                 }
 
-                if (machinesProcessedCount % internalProgressInterval == 0 || machinesProcessedCount == totalMachines)
+                if (currentCount % internalProgressInterval == 0 || currentCount == totalMachines)
                 {
-                    var progressPercentage = (double)machinesProcessedCount / totalMachines * 100;
+                    var progressPercentage = (double)currentCount / totalMachines * 100;
                     progress.Report((int)progressPercentage);
                 }
-            }
+            });
 
             logService.Log($"Completed processing {machinesProcessedCount} machines from {fileName}");
         }
