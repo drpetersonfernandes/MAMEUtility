@@ -5,8 +5,8 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="About MAME Utility"
-    Width="450"
-    Height="550"
+    Width="500"
+    Height="570"
     ResizeMode="NoResize"
     WindowStartupLocation="CenterScreen"
     Background="{StaticResource WindowBackgroundBrush}"
@@ -44,6 +44,11 @@
                 <TextBlock Margin="0,15,0,0">
                     <Hyperlink NavigateUri="https://www.purelogiccode.com" RequestNavigate="Hyperlink_RequestNavigate">
                         https://www.purelogiccode.com
+                    </Hyperlink>
+                </TextBlock>
+                <TextBlock Margin="0,15,0,0">
+                    <Hyperlink NavigateUri="https://github.com/drpetersonfernandes/MAMEUtility" RequestNavigate="Hyperlink_RequestNavigate">
+                        https://github.com/drpetersonfernandes/MAMEUtility
                     </Hyperlink>
                 </TextBlock>
             </StackPanel>
