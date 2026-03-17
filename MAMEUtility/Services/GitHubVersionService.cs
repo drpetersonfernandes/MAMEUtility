@@ -9,11 +9,13 @@ public class GitHubVersionService : IVersionCheckService, IDisposable
     private const string RepoUrl = "https://api.github.com/repos/drpetersonfernandes/MAMEUtility/releases/latest";
     private readonly HttpClient _httpClient;
     private readonly IVersionService _versionService;
+    private readonly IBugReportService _bugReportService;
 
-    public GitHubVersionService(HttpClient httpClient, IVersionService versionService)
+    public GitHubVersionService(HttpClient httpClient, IVersionService versionService, IBugReportService bugReportService)
     {
         _httpClient = httpClient;
         _versionService = versionService;
+        _bugReportService = bugReportService;
     }
 
     public async Task<(bool IsNewVersionAvailable, string? LatestVersion, string? DownloadUrl)> CheckForUpdatesAsync()
@@ -52,8 +54,7 @@ public class GitHubVersionService : IVersionCheckService, IDisposable
         catch (Exception ex)
         {
             // Report the bug as per user requirement
-            var bugReportService = ServiceLocator.Instance.Resolve<IBugReportService>();
-            await bugReportService.SendExceptionReportAsync(ex);
+            await _bugReportService.SendExceptionReportAsync(ex);
             return (false, null, null);
         }
     }

@@ -7,10 +7,11 @@ using Application = System.Windows.Application;
 
 namespace MAMEUtility.Services;
 
-public class LogService : ILogService, IDisposable
+public class LogService : ILogService
 {
     private readonly IBugReportService _bugReportService;
     private readonly Dispatcher? _dispatcher;
+    private readonly object _lock = new();
     private bool _isBatchOperation;
     private bool _errorsOccurredInBatch;
     private bool _warningsOccurredInBatch;
@@ -29,11 +30,7 @@ public class LogService : ILogService, IDisposable
         if (string.IsNullOrWhiteSpace(message)) return;
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Info);
-
-        _dispatcher?.BeginInvoke(() =>
-        {
-            LogMessageAdded?.Invoke(this, formattedMessage);
-        });
+        DispatchLog(formattedMessage);
     }
 
     public void LogError(string message)
@@ -42,15 +39,15 @@ public class LogService : ILogService, IDisposable
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Error);
 
-        if (_isBatchOperation)
+        lock (_lock)
         {
-            _errorsOccurredInBatch = true;
+            if (_isBatchOperation)
+            {
+                _errorsOccurredInBatch = true;
+            }
         }
 
-        _dispatcher?.BeginInvoke(() =>
-        {
-            LogMessageAdded?.Invoke(this, formattedMessage);
-        });
+        DispatchLog(formattedMessage);
     }
 
     public void LogWarning(string message)
@@ -59,59 +56,94 @@ public class LogService : ILogService, IDisposable
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Warning);
 
-        if (_isBatchOperation)
+        lock (_lock)
         {
-            _warningsOccurredInBatch = true;
+            if (_isBatchOperation)
+            {
+                _warningsOccurredInBatch = true;
+            }
         }
 
-        _dispatcher?.BeginInvoke(() =>
-        {
-            LogMessageAdded?.Invoke(this, formattedMessage);
-        });
+        DispatchLog(formattedMessage);
     }
 
     public async Task LogExceptionAsync(Exception exception, string additionalInfo = "")
     {
         var errorMessage = FormatExceptionMessage(exception, additionalInfo);
 
-        if (_isBatchOperation)
+        lock (_lock)
         {
-            _errorsOccurredInBatch = true;
+            if (_isBatchOperation)
+            {
+                _errorsOccurredInBatch = true;
+            }
         }
 
         // Report to bug API
         await _bugReportService.SendExceptionReportAsync(exception).ConfigureAwait(false);
 
-        _dispatcher?.BeginInvoke(() =>
+        DispatchLog(errorMessage);
+    }
+
+    private void DispatchLog(string formattedMessage)
+    {
+        if (_dispatcher != null)
         {
-            LogMessageAdded?.Invoke(this, errorMessage);
-        });
+            _dispatcher.BeginInvoke(() =>
+            {
+                LogMessageAdded?.Invoke(this, formattedMessage);
+            });
+        }
+        else
+        {
+            // Fallback for non-UI contexts (unit tests, early startup)
+            LogMessageAdded?.Invoke(this, formattedMessage);
+            System.Diagnostics.Debug.WriteLine(formattedMessage);
+        }
     }
 
     public void BeginBatchOperation()
     {
-        _isBatchOperation = true;
-        _errorsOccurredInBatch = false;
-        _warningsOccurredInBatch = false;
+        lock (_lock)
+        {
+            _isBatchOperation = true;
+            _errorsOccurredInBatch = false;
+            _warningsOccurredInBatch = false;
+        }
     }
 
-    public void EndBatchOperation(string summaryTitle = "Batch Operation Completed")
+    public void EndBatchOperation(string summaryTitle = "Batch Operation Completed", bool wasCancelled = false)
     {
-        _isBatchOperation = false;
+        bool errors;
+        bool warnings;
 
-        if (_errorsOccurredInBatch || _warningsOccurredInBatch)
+        lock (_lock)
         {
-            var type = _errorsOccurredInBatch ? "errors" : "warnings";
-            var message = $"The batch operation completed, but some {type} occurred. Please review the log viewer for details.";
-
-            _dispatcher?.BeginInvoke(() =>
-            {
-                BatchOperationCompleted?.Invoke(this, (summaryTitle, message, _errorsOccurredInBatch));
-            });
+            _isBatchOperation = false;
+            errors = _errorsOccurredInBatch;
+            warnings = _warningsOccurredInBatch;
+            _errorsOccurredInBatch = false;
+            _warningsOccurredInBatch = false;
         }
 
-        _errorsOccurredInBatch = false;
-        _warningsOccurredInBatch = false;
+        if (!wasCancelled && (errors || warnings))
+        {
+            var type = errors ? "errors" : "warnings";
+            var message = $"The batch operation completed, but some {type} occurred. Please review the log viewer for details.";
+
+            if (_dispatcher != null)
+            {
+                _dispatcher.BeginInvoke(() =>
+                {
+                    BatchOperationCompleted?.Invoke(this, (summaryTitle, message, errors));
+                });
+            }
+            else
+            {
+                BatchOperationCompleted?.Invoke(this, (summaryTitle, message, errors));
+                System.Diagnostics.Debug.WriteLine($"[Batch Completed] {summaryTitle}: {message}");
+            }
+        }
     }
 
     private static string FormatLogMessage(string message, LogLevel level)

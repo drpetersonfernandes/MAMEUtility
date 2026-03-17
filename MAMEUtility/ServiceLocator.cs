@@ -4,13 +4,14 @@ using MAMEUtility.Services;
 
 namespace MAMEUtility;
 
-public class ServiceLocator
+public class ServiceLocator : IDisposable
 {
     private static readonly Lazy<ServiceLocator> Instance2 = new(static () => new ServiceLocator());
     private readonly Dictionary<Type, object> _services = new();
     private static readonly HttpClient SharedHttpClient = new();
 
     public static ServiceLocator Instance => Instance2.Value;
+    public static bool IsInstanceCreated => Instance2.IsValueCreated;
 
     private ServiceLocator()
     {
@@ -63,11 +64,11 @@ public class ServiceLocator
         Register<IMameProcessingService>(mameProcessingService);
 
         // ApplicationStatsService
-        var appStatsService = new ApplicationStatsService(SharedHttpClient, appConfig.BugReportApiKey, versionService);
+        var appStatsService = new ApplicationStatsService(SharedHttpClient, appConfig.BugReportApiKey, versionService, bugReportService);
         Register<IApplicationStatsService>(appStatsService);
 
         // VersionCheckService
-        var versionCheckService = new GitHubVersionService(SharedHttpClient, versionService);
+        var versionCheckService = new GitHubVersionService(SharedHttpClient, versionService, bugReportService);
         Register<IVersionCheckService>(versionCheckService);
     }
 
@@ -84,5 +85,20 @@ public class ServiceLocator
         }
 
         throw new InvalidOperationException($"Service of type {typeof(T).Name} is not registered.");
+    }
+
+    public void Dispose()
+    {
+        foreach (var service in _services.Values)
+        {
+            if (service is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+
+        _services.Clear();
+        SharedHttpClient.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

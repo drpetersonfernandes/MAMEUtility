@@ -104,6 +104,23 @@ public static class MameFull
                 progress.Report(100);
                 logService.Log("MAME Full XML file created successfully.");
             }
+            catch (OperationCanceledException)
+            {
+                // Clean up temp file on cancellation
+                if (File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        /* Ignore */
+                    }
+                }
+
+                throw;
+            }
             catch (Exception ex)
             {
                 // Log and report the error

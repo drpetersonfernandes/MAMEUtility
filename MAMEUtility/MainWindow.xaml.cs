@@ -47,9 +47,9 @@ public partial class MainWindow
         Closing += MainWindow_Closing;
     }
 
-    private static void LogService_BatchOperationCompleted(object? sender, (string Title, string Message, bool HasErrors) e)
+    private void LogService_BatchOperationCompleted(object? sender, (string Title, string Message, bool HasErrors) e)
     {
-        MessageBox.Show(e.Message, e.Title, MessageBoxButton.OK, e.HasErrors ? MessageBoxImage.Error : MessageBoxImage.Warning);
+        MessageBox.Show(this, e.Message, e.Title, MessageBoxButton.OK, e.HasErrors ? MessageBoxImage.Error : MessageBoxImage.Warning);
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -254,8 +254,9 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameFullListAsync(inputFilePath, outputFilePath, progress, token);
-                _logService.Log("Output file saved.");
             }
+
+            _logService.Log("Output file saved.");
         }
         catch (OperationCanceledException)
         {
@@ -302,7 +303,7 @@ public partial class MainWindow
 
             if (_cancellationTokenSource != null)
             {
-                var token = _cancellationTokenSource.Token; // Add this line
+                var token = _cancellationTokenSource.Token;
 
                 var progress = new Progress<int>(value =>
                 {
@@ -310,8 +311,9 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameManufacturerListsAsync(inputFilePath, outputFolderPath, progress, token);
-                _logService.Log("Data extracted and saved successfully for all manufacturers.");
             }
+
+            _logService.Log("Data extracted and saved successfully for all manufacturers.");
         }
         catch (OperationCanceledException)
         {
@@ -358,7 +360,7 @@ public partial class MainWindow
 
             if (_cancellationTokenSource != null)
             {
-                var token = _cancellationTokenSource.Token; // Add this line
+                var token = _cancellationTokenSource.Token;
 
                 var progress = new Progress<int>(value =>
                 {
@@ -366,8 +368,9 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameYearListsAsync(inputFilePath, outputFolderPath, progress, token);
-                _logService.Log("XML files created successfully for all years.");
             }
+
+            _logService.Log("XML files created successfully for all years.");
         }
         catch (OperationCanceledException)
         {
@@ -414,7 +417,7 @@ public partial class MainWindow
 
             if (_cancellationTokenSource != null)
             {
-                var token = _cancellationTokenSource.Token; // Add this line
+                var token = _cancellationTokenSource.Token;
 
                 var progress = new Progress<int>(value =>
                 {
@@ -422,8 +425,9 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameSourcefileListsAsync(inputFilePath, outputFolderPath, progress, token);
-                _logService.Log("Data extracted and saved successfully for all source files.");
             }
+
+            _logService.Log("Data extracted and saved successfully for all source files.");
         }
         catch (OperationCanceledException)
         {
@@ -469,7 +473,7 @@ public partial class MainWindow
 
             if (_cancellationTokenSource != null)
             {
-                var token = _cancellationTokenSource.Token; // Add this line
+                var token = _cancellationTokenSource.Token;
 
                 var progress = new Progress<int>(value =>
                 {
@@ -477,8 +481,9 @@ public partial class MainWindow
                 });
 
                 await _mameProcessingService.CreateMameSoftwareListAsync(inputFolderPath, outputFilePath, progress, token);
-                _logService.Log("Consolidated XML file created successfully.");
             }
+
+            _logService.Log("Consolidated XML file created successfully.");
         }
         catch (OperationCanceledException)
         {

@@ -89,7 +89,7 @@ public static class CopyImages
         }
         finally
         {
-            logService.EndBatchOperation("Image Copy Completed");
+            logService.EndBatchOperation("Image Copy Completed", cancellationToken.IsCancellationRequested);
         }
 
         logService.Log($"Image copy operation completed. Processed {filesProcessedCount} of {totalFiles} files.");
@@ -161,20 +161,22 @@ public static class CopyImages
             logService.Log($"Found {totalMachines} machine entries in {fileName}. Starting sequential image copy...");
 
             // Offload the synchronous file copy loop to a background thread to prevent UI freezing
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
+                var localMissingImagesCount = 0;
                 foreach (var machineName in machineNames)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     try
                     {
-                        ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService, ref missingImagesCount, maxWarnings);
+                        ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService, ref localMissingImagesCount, maxWarnings);
+                        missingImagesCount = localMissingImagesCount;
                     }
                     catch (Exception ex)
                     {
                         logService.LogError($"Error processing images for {machineName}: {ex.Message}");
-                        logService.LogExceptionAsync(ex, $"Error processing images for {machineName}").GetAwaiter().GetResult();
+                        await logService.LogExceptionAsync(ex, $"Error processing images for {machineName}").ConfigureAwait(false);
                     }
 
                     machinesProcessedCount++;

@@ -31,11 +31,10 @@ public static class MameManufacturer
                     if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
                     {
                         var name = reader.GetAttribute("name") ?? "";
-                        var emulation = reader.GetAttribute("emulation") ?? "";
 
                         // Determine if we should process this machine
                         var isBios = name.Contains("bios", StringComparison.OrdinalIgnoreCase);
-                        var isPreliminary = emulation == "preliminary";
+                        var isPreliminary = false;
 
                         string? manufacturer = null;
                         string? description = null;
@@ -53,6 +52,11 @@ public static class MameManufacturer
                                     else if (string.Equals(subReader.Name, "description", StringComparison.OrdinalIgnoreCase))
                                     {
                                         description = await subReader.ReadElementContentAsStringAsync();
+                                    }
+                                    else if (string.Equals(subReader.Name, "driver", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        var status = subReader.GetAttribute("status");
+                                        isPreliminary = string.Equals(status, "preliminary", StringComparison.OrdinalIgnoreCase);
                                     }
                                 }
                             }

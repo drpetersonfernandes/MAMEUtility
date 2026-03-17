@@ -27,7 +27,7 @@ Whether you're curating a custom arcade cabinet setup, organizing ROMs by manufa
 |---------|-------------|
 | **Full Driver List** | Generate comprehensive name/description mappings from MAME XML |
 | **By Manufacturer** | Automatically separate ROMs by company (e.g., `Capcom.xml`, `Nintendo.xml`, `Sega.xml`) |
-| **By Year** | Organize games chronologically with 4-digit year validation (1970-2099) |
+| **By Year** | Organize games chronologically |
 | **By Source File** | Group machines by their MAME driver source code file |
 | **Software Lists** | Process and consolidate MAME software list XML directories |
 

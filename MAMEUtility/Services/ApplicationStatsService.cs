@@ -13,12 +13,14 @@ public class ApplicationStatsService : IApplicationStatsService, IDisposable
     private const string ApplicationId = "mame-utility";
     private readonly HttpClient _httpClient;
     private readonly IVersionService _versionService;
+    private readonly IBugReportService _bugReportService;
 
-    public ApplicationStatsService(HttpClient httpClient, string apiKey, IVersionService versionService)
+    public ApplicationStatsService(HttpClient httpClient, string apiKey, IVersionService versionService, IBugReportService bugReportService)
     {
         _httpClient = httpClient;
         _apiKey = apiKey;
         _versionService = versionService;
+        _bugReportService = bugReportService;
     }
 
     public async Task SendStartStatsAsync()
@@ -46,8 +48,7 @@ public class ApplicationStatsService : IApplicationStatsService, IDisposable
         catch (Exception ex)
         {
             // Report bugs as requested
-            var bugReportService = ServiceLocator.Instance.Resolve<IBugReportService>();
-            await bugReportService.SendExceptionReportAsync(ex);
+            await _bugReportService.SendExceptionReportAsync(ex);
         }
     }
 

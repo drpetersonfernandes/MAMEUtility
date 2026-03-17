@@ -94,15 +94,20 @@ public static partial class FileNameHelper
             // Report exception to bug API
             try
             {
-                var bugReportService = ServiceLocator.Instance.Resolve<Interfaces.IBugReportService>();
-                _ = bugReportService.SendExceptionReportAsync(ex);
+                if (ServiceLocator.IsInstanceCreated)
+                {
+                    var bugReportService = ServiceLocator.Instance.Resolve<Interfaces.IBugReportService>();
+                    _ = Task.Run(async () => await bugReportService.SendExceptionReportAsync(ex).ConfigureAwait(false));
+                }
             }
             catch
             {
                 // Silently fail if bug reporting is not available
             }
 
-            return false;
+            // If we can't determine if paths are equal, assume they ARE equal to be safe
+            // and prevent potential overwriting of input files.
+            return true;
         }
     }
 

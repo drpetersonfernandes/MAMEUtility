@@ -74,9 +74,10 @@ public partial class App : IDisposable
 
             if (_logService != null)
             {
-                // Use Task.Run to ensure the async work happens on a background thread,
-                // then wait for it to complete. This avoids deadlocks on the UI thread.
-                Task.Run(() => _logService.LogExceptionAsync(exception, context)).GetAwaiter().GetResult();
+                // Fire and forget to avoid deadlocks on the UI thread.
+                // We don't wait for the result because blocking the UI thread here
+                // can cause deadlocks if the logging service needs to marshal back to the UI thread.
+                _ = Task.Run(async () => await _logService.LogExceptionAsync(exception, context).ConfigureAwait(false));
             }
             else
             {
@@ -104,6 +105,15 @@ public partial class App : IDisposable
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
+
+        // Dispose service locator if it was created
+        if (ServiceLocator.IsInstanceCreated)
+        {
+            ServiceLocator.Instance.Dispose();
+        }
+
+        // Clear reference
+        _logService = null;
 
         // Suppress finalization
         GC.SuppressFinalize(this);

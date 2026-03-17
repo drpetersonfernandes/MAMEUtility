@@ -89,7 +89,7 @@ public static class CopyRoms
         }
         finally
         {
-            logService.EndBatchOperation("ROM Copy Completed");
+            logService.EndBatchOperation("ROM Copy Completed", cancellationToken.IsCancellationRequested);
         }
 
         logService.Log($"ROM copy operation completed. Processed {filesProcessed} of {totalFiles} files.");
@@ -161,20 +161,22 @@ public static class CopyRoms
             logService.Log($"Found {totalRoms} machine entries in {fileName}. Starting sequential copy...");
 
             // Offload the synchronous file copy loop to a background thread to prevent UI freezing
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
+                var localMissingRomsCount = 0;
                 foreach (var machineName in machineNames)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     try
                     {
-                        CopyRom(sourceDirectory, destinationDirectory, machineName, logService, ref missingRomsCount, maxWarnings);
+                        CopyRom(sourceDirectory, destinationDirectory, machineName, logService, ref localMissingRomsCount, maxWarnings);
+                        missingRomsCount = localMissingRomsCount;
                     }
                     catch (Exception ex)
                     {
                         logService.LogError($"Error copying ROM for {machineName}: {ex.Message}");
-                        logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}").GetAwaiter().GetResult();
+                        await logService.LogExceptionAsync(ex, $"Error copying ROM for {machineName}").ConfigureAwait(false);
                     }
 
                     romsProcessed++;

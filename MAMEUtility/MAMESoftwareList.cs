@@ -8,6 +8,9 @@ public static class MameSoftwareList
 {
     public static async Task CreateAndSaveSoftwareListAsync(string inputFolderPath, string outputFilePath, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
     {
+        var outputDirectory = Path.GetDirectoryName(outputFilePath) ?? Path.GetTempPath();
+        var tempFilePath = Path.Combine(outputDirectory, $"MameSoftwareList_{Guid.NewGuid()}.tmp");
+
         try
         {
             if (!Directory.Exists(inputFolderPath))
@@ -39,7 +42,7 @@ public static class MameSoftwareList
             var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
             var writerSettings = new XmlWriterSettings { Async = true, Indent = true };
 
-            await using (var writerStream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+            await using (var writerStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
             await using (var xmlWriter = XmlWriter.Create(writerStream, writerSettings))
             {
                 await xmlWriter.WriteStartDocumentAsync();
@@ -101,16 +104,48 @@ public static class MameSoftwareList
                 await xmlWriter.WriteEndDocumentAsync();
             }
 
+            // After closing the files, move the temporary file to the final destination
+            if (File.Exists(outputFilePath))
+            {
+                File.Delete(outputFilePath);
+            }
+
+            File.Move(tempFilePath, outputFilePath);
+
             progress.Report(100);
             logService.Log($"Consolidated XML file saved to: {outputFilePath}");
         }
         catch (OperationCanceledException)
         {
+            if (File.Exists(tempFilePath))
+            {
+                try
+                {
+                    File.Delete(tempFilePath);
+                }
+                catch
+                {
+                    /* Ignore */
+                }
+            }
+
             throw;
         }
         catch (Exception ex)
         {
             await logService.LogExceptionAsync(ex, "Error in method CreateAndSaveSoftwareListAsync");
+            if (File.Exists(tempFilePath))
+            {
+                try
+                {
+                    File.Delete(tempFilePath);
+                }
+                catch
+                {
+                    /* Ignore */
+                }
+            }
+
             throw;
         }
     }
