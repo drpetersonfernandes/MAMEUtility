@@ -33,52 +33,44 @@ public static class MameManufacturer
                         var name = reader.GetAttribute("name") ?? "";
                         var emulation = reader.GetAttribute("emulation") ?? "";
 
-                        if (name.Contains("bios", StringComparison.OrdinalIgnoreCase) || emulation == "preliminary")
-                        {
-                            reader.Skip();
-                            // Do NOT use 'continue' here. reader.Skip() positions the reader on the next node.
-                            // The loop's next iteration will call ReadAsync() which would skip the next machine.
-                        }
-                        else
-                        {
-                            string? manufacturer = null;
-                            string? description = null;
+                        // Determine if we should process this machine
+                        var isBios = name.Contains("bios", StringComparison.OrdinalIgnoreCase);
+                        var isPreliminary = emulation == "preliminary";
 
-                            using (var subReader = reader.ReadSubtree())
+                        string? manufacturer = null;
+                        string? description = null;
+
+                        using (var subReader = reader.ReadSubtree())
+                        {
+                            while (await subReader.ReadAsync())
                             {
-                                while (await subReader.ReadAsync())
+                                if (subReader.NodeType == XmlNodeType.Element)
                                 {
-                                    if (subReader.NodeType == XmlNodeType.Element)
+                                    if (string.Equals(subReader.Name, "manufacturer", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        var nodeName = subReader.Name;
-                                        if (string.Equals(nodeName, "manufacturer", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            manufacturer = await subReader.ReadElementContentAsStringAsync();
-                                            continue; // ReadElementContentAsStringAsync already advanced the reader
-                                        }
-
-                                        if (string.Equals(nodeName, "description", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            description = await subReader.ReadElementContentAsStringAsync();
-                                        }
+                                        manufacturer = await subReader.ReadElementContentAsStringAsync();
+                                    }
+                                    else if (string.Equals(subReader.Name, "description", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        description = await subReader.ReadElementContentAsStringAsync();
                                     }
                                 }
                             }
-
-                            if (!string.IsNullOrEmpty(manufacturer) && !string.IsNullOrEmpty(description) && !description.Contains("bios", StringComparison.OrdinalIgnoreCase))
-                            {
-                                if (!manufacturerData.TryGetValue(manufacturer, out var machines))
-                                {
-                                    machines = new List<(string Name, string Description)>();
-                                    manufacturerData[manufacturer] = machines;
-                                }
-
-                                machines.Add((name, description));
-                            }
-
-                            processedCount++;
                         }
 
+                        // Apply filters after reading
+                        if (!isBios && !isPreliminary && !string.IsNullOrEmpty(manufacturer) && !string.IsNullOrEmpty(description) && !description.Contains("bios", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!manufacturerData.TryGetValue(manufacturer, out var machines))
+                            {
+                                machines = new List<(string Name, string Description)>();
+                                manufacturerData[manufacturer] = machines;
+                            }
+
+                            machines.Add((name, description));
+                        }
+
+                        processedCount++;
                         if (processedCount % 10000 == 0)
                         {
                             logService.Log($"Scanned {processedCount} machines...");

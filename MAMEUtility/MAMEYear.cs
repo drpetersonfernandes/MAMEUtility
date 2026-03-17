@@ -6,7 +6,12 @@ namespace MAMEUtility;
 
 public static class MameYear
 {
-    public static async Task CreateAndSaveMameYearAsync(string inputFilePath, string outputFolderMameYear, IProgress<int> progress, ILogService logService, CancellationToken cancellationToken = default)
+    public static async Task CreateAndSaveMameYearAsync(
+        string inputFilePath,
+        string outputFolderMameYear,
+        IProgress<int> progress,
+        ILogService logService,
+        CancellationToken cancellationToken = default)
     {
         logService.Log($"Processing years from: {inputFilePath}");
         logService.Log($"Output folder: {outputFolderMameYear}");
@@ -14,9 +19,14 @@ public static class MameYear
         try
         {
             var yearData = new Dictionary<string, List<(string Name, string Description)>>(StringComparer.OrdinalIgnoreCase);
-            var readerSettings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, IgnoreWhitespace = true, Async = true };
+            var readerSettings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                IgnoreWhitespace = true,
+                Async = true
+            };
 
-            // Single pass: collect all required data grouped by year
+            // Single pass: collect all data grouped by year
             await using (var fileStream = new FileStream(inputFilePath, FileMode.Open, FileAccess.Read))
             {
                 var totalBytes = fileStream.Length;
@@ -24,33 +34,31 @@ public static class MameYear
                 long processedCount = 0;
 
                 using var reader = XmlReader.Create(fileStream, readerSettings);
+
                 while (await reader.ReadAsync())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (reader is { NodeType: XmlNodeType.Element, Name: "machine" })
+                    if (reader.NodeType == XmlNodeType.Element &&
+                        string.Equals(reader.Name, "machine", StringComparison.OrdinalIgnoreCase))
                     {
                         var name = reader.GetAttribute("name") ?? "";
                         string? year = null;
                         string? description = null;
 
-                        using (var subReader = reader.ReadSubtree())
+                        // Use ReadSubtree() - this is the correct pattern used in other files
+                        using var subReader = reader.ReadSubtree();
+                        while (await subReader.ReadAsync())
                         {
-                            while (await subReader.ReadAsync())
+                            if (subReader.NodeType == XmlNodeType.Element)
                             {
-                                if (subReader.NodeType == XmlNodeType.Element)
+                                if (string.Equals(subReader.Name, "year", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    var nodeName = subReader.Name;
-                                    if (string.Equals(nodeName, "year", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        year = await subReader.ReadElementContentAsStringAsync();
-                                        continue;
-                                    }
-
-                                    if (string.Equals(nodeName, "description", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        description = await subReader.ReadElementContentAsStringAsync();
-                                    }
+                                    year = (await subReader.ReadElementContentAsStringAsync()).Trim();
+                                }
+                                else if (string.Equals(subReader.Name, "description", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    description = await subReader.ReadElementContentAsStringAsync();
                                 }
                             }
                         }
@@ -73,6 +81,7 @@ public static class MameYear
                         }
                     }
 
+                    // Report progress based on bytes read
                     if (totalBytes > 0)
                     {
                         var currentProgress = (int)((double)fileStream.Position / totalBytes * 50);
@@ -85,9 +94,17 @@ public static class MameYear
                 }
             }
 
-            logService.Log($"Found {yearData.Count} unique years. Saving files...");
+            logService.Log($"Found {yearData.Count} unique years with {yearData.Values.Sum(static v => v.Count)} total machines.");
 
-            // Second phase: Write the collected data to files
+            if (yearData.Count == 0)
+            {
+                logService.LogWarning("No valid year data was found. Check if the XML contains <year> tags.");
+                progress.Report(100);
+                return;
+            }
+
+            logService.Log("Saving year XML files...");
+
             var totalYears = yearData.Count;
             var yearsSaved = 0;
             var writerSettings = new XmlWriterSettings { Indent = true, Async = true };
@@ -122,7 +139,7 @@ public static class MameYear
                 var currentProgress = 50 + (int)((double)yearsSaved / totalYears * 50);
                 progress.Report(currentProgress);
 
-                if (yearsSaved % 10 == 0 || yearsSaved == totalYears)
+                if (yearsSaved % 20 == 0 || yearsSaved == totalYears)
                 {
                     logService.Log($"Saved {yearsSaved}/{totalYears} year files.");
                 }
@@ -133,19 +150,17 @@ public static class MameYear
         }
         catch (Exception ex)
         {
-            await logService.LogExceptionAsync(ex, "Error in method MAMEYear.CreateAndSaveMameYearAsync");
+            await logService.LogExceptionAsync(ex, "Error in MameYear.CreateAndSaveMameYearAsync");
             throw;
         }
     }
 
     private static bool IsValidYear(string year)
     {
-        // Allow 4-digit years (e.g., "1980", "1995", "2000")
-        // Also allow years with ? for unknown digits (e.g., "198?", "19??")
+        year = year.Trim();
         if (string.IsNullOrWhiteSpace(year) || year.Length != 4)
             return false;
 
-        // Check if it's all digits or contains only digits and ?
         foreach (var c in year)
         {
             if (!char.IsDigit(c) && c != '?')
