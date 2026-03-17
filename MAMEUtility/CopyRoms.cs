@@ -153,6 +153,8 @@ public static class CopyRoms
             }
 
             var romsProcessed = 0;
+            var missingRomsCount = 0;
+            const int maxWarnings = 50;
             const int internalLogInterval = 100;
             const int internalProgressInterval = 50;
 
@@ -167,7 +169,7 @@ public static class CopyRoms
 
                     try
                     {
-                        CopyRom(sourceDirectory, destinationDirectory, machineName, logService);
+                        CopyRom(sourceDirectory, destinationDirectory, machineName, logService, ref missingRomsCount, maxWarnings);
                     }
                     catch (Exception ex)
                     {
@@ -188,6 +190,11 @@ public static class CopyRoms
                         progress.Report((int)progressPercentage);
                     }
                 }
+
+                if (missingRomsCount > maxWarnings)
+                {
+                    logService.LogWarning($"{missingRomsCount} total ROM files were not found in {fileName}. Only the first {maxWarnings} were logged individually.");
+                }
             }, cancellationToken);
 
             logService.Log($"Completed processing {romsProcessed} ROMs from {fileName}");
@@ -201,7 +208,7 @@ public static class CopyRoms
         progress.Report(100);
     }
 
-    private static void CopyRom(string sourceDirectory, string destinationDirectory, string? machineName, ILogService logService)
+    private static void CopyRom(string sourceDirectory, string destinationDirectory, string? machineName, ILogService logService, ref int missingFilesCount, int maxWarnings)
     {
         if (string.IsNullOrEmpty(machineName)) return;
 
@@ -214,7 +221,11 @@ public static class CopyRoms
         }
         else
         {
-            logService.LogWarning($"Source ROM file not found: {sourceFile}");
+            missingFilesCount++;
+            if (missingFilesCount <= maxWarnings)
+            {
+                logService.LogWarning($"Source ROM file not found: {sourceFile}");
+            }
         }
     }
 }

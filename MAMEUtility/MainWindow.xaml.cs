@@ -211,42 +211,42 @@ public partial class MainWindow
     {
         try
         {
+            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+            var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                "Select MAME full driver information in XML",
+                "XML files (*.xml)|*.xml");
+
+            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            {
+                _logService.Log("No input file selected. Operation cancelled.");
+                return;
+            }
+
+            var inputFilePath = inputFilePaths[0];
+
+            _logService.Log("Put a name to your output file.");
+            var outputFilePath = _dialogService.ShowSaveFileDialog(
+                "Save MAMEFull",
+                "XML files (*.xml)|*.xml",
+                "MAMEFull.xml");
+
+            if (string.IsNullOrEmpty(outputFilePath))
+            {
+                _logService.Log("No output file specified for MAMEFull.xml. Operation cancelled.");
+                return;
+            }
+
+            if (FileNameHelper.ArePathsEqual(inputFilePath, outputFilePath))
+            {
+                _logService.LogError("Input and output files cannot be the same. Please choose a different name or location for the output file.");
+                return;
+            }
+
             SetProcessingState(true, "MAME Full List");
 
             if (_cancellationTokenSource != null)
             {
-                var token = _cancellationTokenSource.Token; // This line was missing
-
-                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-                var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Select MAME full driver information in XML",
-                    "XML files (*.xml)|*.xml");
-
-                if (inputFilePaths == null || inputFilePaths.Length == 0)
-                {
-                    _logService.Log("No input file selected. Operation cancelled.");
-                    return;
-                }
-
-                var inputFilePath = inputFilePaths[0];
-
-                _logService.Log("Put a name to your output file.");
-                var outputFilePath = _dialogService.ShowSaveFileDialog(
-                    "Save MAMEFull",
-                    "XML files (*.xml)|*.xml",
-                    "MAMEFull.xml");
-
-                if (string.IsNullOrEmpty(outputFilePath))
-                {
-                    _logService.Log("No output file specified for MAMEFull.xml. Operation cancelled.");
-                    return;
-                }
-
-                if (FileNameHelper.ArePathsEqual(inputFilePath, outputFilePath))
-                {
-                    _logService.LogError("Input and output files cannot be the same. Please choose a different name or location for the output file.");
-                    return;
-                }
+                var token = _cancellationTokenSource.Token;
 
                 var progress = new Progress<int>(value =>
                 {
@@ -276,33 +276,33 @@ public partial class MainWindow
     {
         try
         {
+            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+            var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                "Select MAME full driver information in XML",
+                "XML files (*.xml)|*.xml");
+
+            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            {
+                _logService.Log("No input file selected. Operation cancelled.");
+                return;
+            }
+
+            var inputFilePath = inputFilePaths[0];
+
+            _logService.Log("Select Output Folder.");
+            var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
+
+            if (string.IsNullOrEmpty(outputFolderPath))
+            {
+                _logService.Log("No output folder specified. Operation cancelled.");
+                return;
+            }
+
             SetProcessingState(true, "Manufacturer Lists");
 
             if (_cancellationTokenSource != null)
             {
                 var token = _cancellationTokenSource.Token; // Add this line
-
-                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-                var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Select MAME full driver information in XML",
-                    "XML files (*.xml)|*.xml");
-
-                if (inputFilePaths == null || inputFilePaths.Length == 0)
-                {
-                    _logService.Log("No input file selected. Operation cancelled.");
-                    return;
-                }
-
-                var inputFilePath = inputFilePaths[0];
-
-                _logService.Log("Select Output Folder.");
-                var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
-
-                if (string.IsNullOrEmpty(outputFolderPath))
-                {
-                    _logService.Log("No output folder specified. Operation cancelled.");
-                    return;
-                }
 
                 var progress = new Progress<int>(value =>
                 {
@@ -332,33 +332,33 @@ public partial class MainWindow
     {
         try
         {
+            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+            var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                "Select MAME full driver information in XML",
+                "XML files (*.xml)|*.xml");
+
+            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            {
+                _logService.Log("No input file selected. Operation cancelled.");
+                return;
+            }
+
+            var inputFilePath = inputFilePaths[0];
+
+            _logService.Log("Select Output Folder.");
+            var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
+
+            if (string.IsNullOrEmpty(outputFolderPath))
+            {
+                _logService.Log("No output folder specified. Operation cancelled.");
+                return;
+            }
+
             SetProcessingState(true, "Year Lists");
 
             if (_cancellationTokenSource != null)
             {
                 var token = _cancellationTokenSource.Token; // Add this line
-
-                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-                var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Select MAME full driver information in XML",
-                    "XML files (*.xml)|*.xml");
-
-                if (inputFilePaths == null || inputFilePaths.Length == 0)
-                {
-                    _logService.Log("No input file selected. Operation cancelled.");
-                    return;
-                }
-
-                var inputFilePath = inputFilePaths[0];
-
-                _logService.Log("Select Output Folder.");
-                var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
-
-                if (string.IsNullOrEmpty(outputFolderPath))
-                {
-                    _logService.Log("No output folder specified. Operation cancelled.");
-                    return;
-                }
 
                 var progress = new Progress<int>(value =>
                 {
@@ -388,33 +388,33 @@ public partial class MainWindow
     {
         try
         {
+            _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
+            var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                "Select MAME full driver information in XML",
+                "XML files (*.xml)|*.xml");
+
+            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            {
+                _logService.Log("No input file selected. Operation cancelled.");
+                return;
+            }
+
+            var inputFilePath = inputFilePaths[0];
+
+            _logService.Log("Select Output Folder.");
+            var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
+
+            if (string.IsNullOrEmpty(outputFolderPath))
+            {
+                _logService.Log("No output folder specified. Operation cancelled.");
+                return;
+            }
+
             SetProcessingState(true, "Sourcefile Lists");
 
             if (_cancellationTokenSource != null)
             {
                 var token = _cancellationTokenSource.Token; // Add this line
-
-                _logService.Log("Select MAME full driver information in XML. You can download this file from the MAME Website.");
-                var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Select MAME full driver information in XML",
-                    "XML files (*.xml)|*.xml");
-
-                if (inputFilePaths == null || inputFilePaths.Length == 0)
-                {
-                    _logService.Log("No input file selected. Operation cancelled.");
-                    return;
-                }
-
-                var inputFilePath = inputFilePaths[0];
-
-                _logService.Log("Select Output Folder.");
-                var outputFolderPath = _dialogService.ShowFolderBrowserDialog("Select Output Folder");
-
-                if (string.IsNullOrEmpty(outputFolderPath))
-                {
-                    _logService.Log("No output folder specified. Operation cancelled.");
-                    return;
-                }
 
                 var progress = new Progress<int>(value =>
                 {
@@ -444,32 +444,32 @@ public partial class MainWindow
     {
         try
         {
+            _logService.Log("Select the folder containing XML files to process.");
+            var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the folder containing XML files to process");
+
+            if (string.IsNullOrEmpty(inputFolderPath))
+            {
+                _logService.Log("No folder selected. Operation cancelled.");
+                return;
+            }
+
+            _logService.Log("Choose a location to save the consolidated output XML file.");
+            var outputFilePath = _dialogService.ShowSaveFileDialog(
+                "Save Consolidated XML File",
+                "XML Files (*.xml)|*.xml",
+                "MAMESoftwareList.xml");
+
+            if (string.IsNullOrEmpty(outputFilePath))
+            {
+                _logService.Log("No output file specified. Operation cancelled.");
+                return;
+            }
+
             SetProcessingState(true, "Software List");
 
             if (_cancellationTokenSource != null)
             {
                 var token = _cancellationTokenSource.Token; // Add this line
-
-                _logService.Log("Select the folder containing XML files to process.");
-                var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the folder containing XML files to process");
-
-                if (string.IsNullOrEmpty(inputFolderPath))
-                {
-                    _logService.Log("No folder selected. Operation cancelled.");
-                    return;
-                }
-
-                _logService.Log("Choose a location to save the consolidated output XML file.");
-                var outputFilePath = _dialogService.ShowSaveFileDialog(
-                    "Save Consolidated XML File",
-                    "XML Files (*.xml)|*.xml",
-                    "MAMESoftwareList.xml");
-
-                if (string.IsNullOrEmpty(outputFilePath))
-                {
-                    _logService.Log("No output file specified. Operation cancelled.");
-                    return;
-                }
 
                 var progress = new Progress<int>(value =>
                 {
@@ -499,35 +499,35 @@ public partial class MainWindow
     {
         try
         {
+            _logService.Log("Select XML files to merge. You can select multiple XML files.");
+            var inputFilePaths = _dialogService.ShowOpenFileDialog(
+                "Select XML files to merge",
+                "XML files (*.xml)|*.xml",
+                true);
+
+            if (inputFilePaths == null || inputFilePaths.Length == 0)
+            {
+                _logService.Log("No input file selected. Operation cancelled.");
+                return;
+            }
+
+            _logService.Log("Select where to save the merged XML file.");
+            var outputXmlPath = _dialogService.ShowSaveFileDialog(
+                "Save Merged XML",
+                "XML files (*.xml)|*.xml",
+                "Merged.xml");
+
+            if (string.IsNullOrEmpty(outputXmlPath))
+            {
+                _logService.Log("No output file specified for merged XML. Operation cancelled.");
+                return;
+            }
+
             SetProcessingState(true, "List Merging");
 
             if (_cancellationTokenSource != null)
             {
                 var token = _cancellationTokenSource.Token;
-
-                _logService.Log("Select XML files to merge. You can select multiple XML files.");
-                var inputFilePaths = _dialogService.ShowOpenFileDialog(
-                    "Select XML files to merge",
-                    "XML files (*.xml)|*.xml",
-                    true);
-
-                if (inputFilePaths == null || inputFilePaths.Length == 0)
-                {
-                    _logService.Log("No input file selected. Operation cancelled.");
-                    return;
-                }
-
-                _logService.Log("Select where to save the merged XML file.");
-                var outputXmlPath = _dialogService.ShowSaveFileDialog(
-                    "Save Merged XML",
-                    "XML files (*.xml)|*.xml",
-                    "Merged.xml");
-
-                if (string.IsNullOrEmpty(outputXmlPath))
-                {
-                    _logService.Log("No output file specified for merged XML. Operation cancelled.");
-                    return;
-                }
 
                 var outputDatPath = Path.ChangeExtension(outputXmlPath, ".dat");
 

@@ -19,7 +19,11 @@ public static class MameSoftwareList
 
             progress.Report(5);
 
-            var files = Directory.GetFiles(inputFolderPath, "*.xml");
+            var outputFullPath = Path.GetFullPath(outputFilePath);
+            var files = Directory.GetFiles(inputFolderPath, "*.xml")
+                .Where(f => !string.Equals(Path.GetFullPath(f), outputFullPath, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
             if (files.Length == 0)
             {
                 logService.LogWarning($"No XML files found in the specified folder: {inputFolderPath}. Operation cancelled.");

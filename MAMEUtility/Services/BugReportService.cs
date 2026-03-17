@@ -30,7 +30,7 @@ public class BugReportService : IBugReportService
         try
         {
             var message = FormatExceptionMessage(exception);
-            await SendReportAsync(message);
+            await SendReportAsync(message).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -59,7 +59,7 @@ public class BugReportService : IBugReportService
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
         }
         catch (Exception ex)

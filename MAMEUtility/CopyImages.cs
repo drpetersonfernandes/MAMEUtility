@@ -153,6 +153,8 @@ public static class CopyImages
             }
 
             var machinesProcessedCount = 0;
+            var missingImagesCount = 0;
+            const int maxWarnings = 50;
             const int internalLogInterval = 100;
             const int internalProgressInterval = 50;
 
@@ -167,7 +169,7 @@ public static class CopyImages
 
                     try
                     {
-                        ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService);
+                        ProcessMachine(machineName, sourceDirectory, destinationDirectory, logService, ref missingImagesCount, maxWarnings);
                     }
                     catch (Exception ex)
                     {
@@ -188,6 +190,11 @@ public static class CopyImages
                         progress.Report((int)progressPercentage);
                     }
                 }
+
+                if (missingImagesCount > maxWarnings)
+                {
+                    logService.LogWarning($"{missingImagesCount} total image files were not found in {fileName}. Only the first {maxWarnings} were logged individually.");
+                }
             }, cancellationToken);
 
             logService.Log($"Completed processing {machinesProcessedCount} machines from {fileName}");
@@ -201,14 +208,14 @@ public static class CopyImages
         progress.Report(100);
     }
 
-    private static void ProcessMachine(string? machineName, string sourceDirectory, string destinationDirectory, ILogService logService)
+    private static void ProcessMachine(string? machineName, string sourceDirectory, string destinationDirectory, ILogService logService, ref int missingFilesCount, int maxWarnings)
     {
-        CopyImageFile(sourceDirectory, destinationDirectory, machineName, "png", logService);
-        CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpg", logService);
-        CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpeg", logService);
+        CopyImageFile(sourceDirectory, destinationDirectory, machineName, "png", logService, ref missingFilesCount, maxWarnings);
+        CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpg", logService, ref missingFilesCount, maxWarnings);
+        CopyImageFile(sourceDirectory, destinationDirectory, machineName, "jpeg", logService, ref missingFilesCount, maxWarnings);
     }
 
-    private static void CopyImageFile(string sourceDirectory, string destinationDirectory, string? machineName, string extension, ILogService logService)
+    private static void CopyImageFile(string sourceDirectory, string destinationDirectory, string? machineName, string extension, ILogService logService, ref int missingFilesCount, int maxWarnings)
     {
         if (string.IsNullOrEmpty(machineName)) return;
 
@@ -221,7 +228,11 @@ public static class CopyImages
         }
         else
         {
-            logService.LogWarning($"Source image file not found: {sourceFile}");
+            missingFilesCount++;
+            if (missingFilesCount <= maxWarnings)
+            {
+                logService.LogWarning($"Source image file not found: {sourceFile}");
+            }
         }
     }
 }

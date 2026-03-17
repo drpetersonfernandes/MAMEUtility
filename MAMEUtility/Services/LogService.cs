@@ -42,14 +42,14 @@ public class LogService : ILogService, IDisposable
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Error);
 
+        if (_isBatchOperation)
+        {
+            _errorsOccurredInBatch = true;
+        }
+
         _dispatcher?.BeginInvoke(() =>
         {
             LogMessageAdded?.Invoke(this, formattedMessage);
-
-            if (_isBatchOperation)
-            {
-                _errorsOccurredInBatch = true;
-            }
         });
     }
 
@@ -59,14 +59,14 @@ public class LogService : ILogService, IDisposable
 
         var formattedMessage = FormatLogMessage(message, LogLevel.Warning);
 
+        if (_isBatchOperation)
+        {
+            _warningsOccurredInBatch = true;
+        }
+
         _dispatcher?.BeginInvoke(() =>
         {
             LogMessageAdded?.Invoke(this, formattedMessage);
-
-            if (_isBatchOperation)
-            {
-                _warningsOccurredInBatch = true;
-            }
         });
     }
 
@@ -74,17 +74,17 @@ public class LogService : ILogService, IDisposable
     {
         var errorMessage = FormatExceptionMessage(exception, additionalInfo);
 
+        if (_isBatchOperation)
+        {
+            _errorsOccurredInBatch = true;
+        }
+
         // Report to bug API
-        await _bugReportService.SendExceptionReportAsync(exception);
+        await _bugReportService.SendExceptionReportAsync(exception).ConfigureAwait(false);
 
         _dispatcher?.BeginInvoke(() =>
         {
             LogMessageAdded?.Invoke(this, errorMessage);
-
-            if (_isBatchOperation)
-            {
-                _errorsOccurredInBatch = true;
-            }
         });
     }
 
