@@ -6,7 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:local="clr-namespace:MAMEUtility"
     Title="MAME Utility"
-    Height="850" Width="1050" MinHeight="750" MinWidth="900"
+    Height="750" Width="1050" MinHeight="700" MinWidth="800"
     WindowStartupLocation="CenterScreen"
     Background="{StaticResource WindowBackgroundBrush}"
     mc:Ignorable="d">
@@ -257,14 +257,6 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <TextBlock 
-                    Grid.Row="0" Grid.ColumnSpan="2"
-                    x:Name="ProcessingTextBlock"
-                    Text="Ready" 
-                    Margin="0,0,0,5"
-                    FontWeight="SemiBold"
-                    Foreground="{StaticResource TextSecondaryBrush}"/>
 
                 <Border Grid.Row="1" Grid.Column="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="1" Background="{StaticResource CardBackgroundBrush}" ToolTip="Visual progress indicator">
                     <Grid>

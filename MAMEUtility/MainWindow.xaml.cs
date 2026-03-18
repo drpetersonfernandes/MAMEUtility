@@ -141,17 +141,12 @@ public partial class MainWindow
 
         if (isProcessing)
         {
-            ProcessingTextBlock.Text = !string.IsNullOrEmpty(operationName)
-                ? $"Processing {operationName}..."
-                : "Processing...";
-
             _cancellationTokenSource = new CancellationTokenSource();
             _processingStopwatch.Restart();
             _processingTimer.Start();
         }
         else
         {
-            ProcessingTextBlock.Text = "Ready";
             ProgressPercentageTextBlock.Text = OverallProgressBar.Value >= 100 ? "Completed | " + $"Elapsed: {_processingStopwatch.Elapsed:mm\\:ss}" : "Ready";
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
@@ -448,8 +443,8 @@ public partial class MainWindow
     {
         try
         {
-            _logService.Log("Select the folder containing XML files to process.");
-            var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the folder containing XML files to process");
+            _logService.Log("Select the MAME hash folder containing XML files to process.");
+            var inputFolderPath = _dialogService.ShowFolderBrowserDialog("Select the MAME hash folder containing XML files to process");
 
             if (string.IsNullOrEmpty(inputFolderPath))
             {

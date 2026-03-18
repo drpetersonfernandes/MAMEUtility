@@ -1,5 +1,6 @@
 using System.IO;
 using System.Xml;
+using System.Xml.Linq;
 using MAMEUtility.Interfaces;
 using MAMEUtility.Models;
 using MessagePack;
@@ -48,38 +49,30 @@ public static class MergeList
                     if (string.Equals(nodeName, "Machine", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(nodeName, "Software", StringComparison.OrdinalIgnoreCase))
                     {
-                        string? machineName = null;
-                        string? description = null;
+                        string? machineName;
+                        string? description;
 
                         using (var subReader = reader.ReadSubtree())
                         {
-                            while (await subReader.ReadAsync())
-                            {
-                                if (subReader.NodeType == XmlNodeType.Element)
-                                {
-                                    var subNodeName = subReader.Name;
-                                    if (string.Equals(subNodeName, "MachineName", StringComparison.OrdinalIgnoreCase) ||
-                                        string.Equals(subNodeName, "SoftwareName", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        machineName = await subReader.ReadElementContentAsStringAsync();
-                                        continue;
-                                    }
-
-                                    if (string.Equals(subNodeName, "Description", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        description = await subReader.ReadElementContentAsStringAsync();
-                                    }
-                                }
-                            }
+                            var xElement = await XElement.LoadAsync(subReader, LoadOptions.None, cancellationToken);
+                            machineName = (string?)xElement.Element("MachineName") ?? (string?)xElement.Element("SoftwareName");
+                            description = (string?)xElement.Element("Description");
                         }
 
-                        if (!string.IsNullOrEmpty(machineName) && !uniqueMachines.ContainsKey(machineName))
+                        if (!string.IsNullOrEmpty(machineName))
                         {
-                            uniqueMachines.Add(machineName, new MachineInfo
+                            if (!uniqueMachines.TryGetValue(machineName, out var existing))
                             {
-                                MachineName = machineName,
-                                Description = description ?? string.Empty
-                            });
+                                uniqueMachines.Add(machineName, new MachineInfo
+                                {
+                                    MachineName = machineName,
+                                    Description = description ?? string.Empty
+                                });
+                            }
+                            else if (!string.IsNullOrEmpty(description) && string.IsNullOrEmpty(existing.Description))
+                            {
+                                existing.Description = description;
+                            }
                         }
                     }
                 }
